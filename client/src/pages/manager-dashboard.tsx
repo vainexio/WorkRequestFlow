@@ -377,9 +377,7 @@ export default function ManagerDashboard() {
       setAiSummary(data.summary);
       setAiSummaryCache(prev => ({ ...prev, [assetId]: data.summary }));
     } catch (error: any) {
-      const errorMsg = "Unable to generate summary. Please check that the Gemini API key is configured.";
-      setAiSummary(errorMsg);
-      setAiSummaryCache(prev => ({ ...prev, [assetId]: errorMsg }));
+      setAiSummary("Unable to generate summary. Please try again or check that the Gemini API key is configured correctly.");
     } finally {
       setAiLoading(false);
     }

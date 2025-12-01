@@ -35,6 +35,7 @@ export default function TechnicianDashboard() {
   const [cannotResolveDialog, setCannotResolveDialog] = useState<WorkRequest | null>(null);
   const [aiSummaryDialog, setAiSummaryDialog] = useState<Asset | null>(null);
   const [aiSummary, setAiSummary] = useState<string>("");
+  const [aiSummaryCache, setAiSummaryCache] = useState<Record<string, string>>({});
   const [aiLoading, setAiLoading] = useState(false);
   const [cannotResolveReason, setCannotResolveReason] = useState("");
 
@@ -192,8 +193,9 @@ export default function TechnicianDashboard() {
       if (!response.ok) throw new Error("Failed to get AI summary");
       const data = await response.json();
       setAiSummary(data.summary);
+      setAiSummaryCache(prev => ({ ...prev, [assetId]: data.summary }));
     } catch (error) {
-      toast({ title: "Error", description: "Failed to generate AI summary.", variant: "destructive" });
+      setAiSummary("Unable to generate summary. Please try again or check that the Gemini API key is configured correctly.");
     } finally {
       setAiLoading(false);
     }
@@ -201,8 +203,12 @@ export default function TechnicianDashboard() {
 
   const handleOpenAiSummary = (asset: Asset) => {
     setAiSummaryDialog(asset);
-    setAiSummary("");
-    fetchAiSummary(asset.assetId);
+    if (aiSummaryCache[asset.assetId]) {
+      setAiSummary(aiSummaryCache[asset.assetId]);
+    } else {
+      setAiSummary("");
+      fetchAiSummary(asset.assetId);
+    }
   };
 
   const handleSubmitServiceReport = (e: React.FormEvent) => {

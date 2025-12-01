@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { GoogleGenAI } from "@google/genai";
 import User from "./models/User";
 import WorkRequest from "./models/WorkRequest";
 import Asset from "./models/Asset";
@@ -999,25 +1000,14 @@ Please provide:
         return res.status(500).json({ message: "Gemini API key not configured" });
       }
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-          }),
-        }
-      );
+      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to get AI response');
-      }
-
-      const data = await response.json();
-      const summary = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Unable to generate summary';
+      const summary = response.text || 'Unable to generate summary';
 
       return res.json({
         summary,
