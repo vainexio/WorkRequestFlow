@@ -984,16 +984,21 @@ export async function registerRoutes(
         `Date: ${r.serviceDate.toLocaleDateString()}, Description: ${r.workDescription}, Findings: ${r.reportFindings}`
       ).join('\n\n');
 
-      const prompt = `Analyze the following service report work descriptions for a piece of equipment and provide a concise summary of the maintenance activities, common issues, and overall equipment health trend over the last 30 days. Be specific and actionable.
+      const prompt = `Analyze the following equipment service reports and provide a **brief, concise summary** using markdown formatting.
 
-Work Descriptions:
+**Reports:**
 ${workDescriptions}
 
-Please provide:
-1. Summary of maintenance activities performed
-2. Common issues identified
-3. Equipment health trend assessment
-4. Recommendations for future maintenance`;
+Format your response using markdown with:
+- **Bold** for key points and section headers
+- Bullet points for lists
+- Keep each section to 2-3 short sentences maximum
+
+Provide ONLY these sections (be very concise):
+1. **Maintenance Summary** - What was done
+2. **Key Issues** - Main problems found
+3. **Health Status** - Current equipment condition (Good/Fair/Poor with brief reason)
+4. **Next Steps** - 1-2 priority recommendations`;
 
       const geminiApiKey = process.env.GEMINI_API_KEY;
       if (!geminiApiKey) {
