@@ -179,6 +179,7 @@ export async function registerRoutes(
         denialReason: req.denialReason,
         scheduledDate: req.scheduledDate,
         submittedBy: req.submittedByName,
+        submittedById: req.submittedBy?.toString(),
         submittedAt: req.createdAt.toISOString(),
         approvedBy: req.approvedByName,
         approvedAt: req.approvedAt,
@@ -224,6 +225,7 @@ export async function registerRoutes(
         denialReason: req.denialReason,
         scheduledDate: req.scheduledDate,
         submittedBy: req.submittedByName,
+        submittedById: req.submittedBy?.toString(),
         submittedAt: req.createdAt.toISOString(),
         approvedBy: req.approvedByName,
         approvedAt: req.approvedAt,
@@ -297,6 +299,7 @@ export async function registerRoutes(
         disruptsOperation: newRequest.disruptsOperation,
         status: newRequest.status,
         submittedBy: newRequest.submittedByName,
+        submittedById: newRequest.submittedBy.toString(),
         submittedAt: newRequest.createdAt.toISOString(),
       });
     } catch (error) {

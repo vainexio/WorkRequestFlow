@@ -18,8 +18,10 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Loader2, Calendar, MapPin, Wrench, CheckCircle2, MessageSquare, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/use-auth";
 
 export default function EmployeeDashboard() {
+  const { user } = useAuth();
   const [isCreating, setIsCreating] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<WorkRequest | null>(null);
   const [feedback, setFeedback] = useState("");
@@ -342,7 +344,7 @@ export default function EmployeeDashboard() {
                     )}
                   </div>
 
-                  {req.status === 'resolved' && !req.requesterConfirmedAt && (
+                  {req.status === 'resolved' && !req.requesterConfirmedAt && req.submittedById === user?.id && (
                     <div className="flex-shrink-0">
                       <Button 
                         onClick={() => setConfirmDialog(req)} 

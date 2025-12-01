@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { WorkRequest, User, Asset, PreventiveMaintenance, DashboardStats, getStatusColor, getStatusLabel, getUrgencyLabel, UrgencyType } from "@/lib/mock-data";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import { 
   Table, 
   TableBody, 
@@ -27,7 +28,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { 
   BarChart3, Clock, CheckCircle2, Users, Loader2, XCircle, Calendar, 
-  Plus, Trash2, Edit, Wrench, Settings, ClipboardList, UserPlus
+  Plus, Trash2, Edit, Wrench, Settings, ClipboardList, UserPlus, Bot,
+  AlertTriangle, TrendingUp, TrendingDown, Activity, Lightbulb
 } from "lucide-react";
 
 interface Technician {
@@ -63,6 +65,11 @@ export default function ManagerDashboard() {
   const [pmTechnicianId, setPmTechnicianId] = useState("");
   const [pmTasks, setPmTasks] = useState("");
   const [pmDuration, setPmDuration] = useState("60");
+
+  const [aiSummaryDialog, setAiSummaryDialog] = useState<Asset | null>(null);
+  const [aiSummary, setAiSummary] = useState<string>("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSummaryCache, setAiSummaryCache] = useState<Record<string, string>>({});
 
   const { data: requests = [], isLoading } = useQuery<WorkRequest[]>({
     queryKey: ["requests-all"],
@@ -358,6 +365,49 @@ export default function ManagerDashboard() {
     setNewPassword("");
   };
 
+  const fetchAiSummary = async (assetId: string) => {
+    setAiLoading(true);
+    try {
+      const response = await fetch(`/api/ai/summary/${assetId}`, { credentials: "include" });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to get AI summary");
+      }
+      const data = await response.json();
+      setAiSummary(data.summary);
+      setAiSummaryCache(prev => ({ ...prev, [assetId]: data.summary }));
+    } catch (error: any) {
+      const errorMsg = "Unable to generate summary. Please check that the Gemini API key is configured.";
+      setAiSummary(errorMsg);
+      setAiSummaryCache(prev => ({ ...prev, [assetId]: errorMsg }));
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleOpenAiSummary = (asset: Asset) => {
+    setAiSummaryDialog(asset);
+    if (aiSummaryCache[asset.assetId]) {
+      setAiSummary(aiSummaryCache[asset.assetId]);
+    } else {
+      setAiSummary("");
+      fetchAiSummary(asset.assetId);
+    }
+  };
+
+  const getAssetRecommendation = (asset: Asset) => {
+    if (asset.healthScore < 50) {
+      return { type: "critical", message: "Schedule immediate inspection and maintenance", color: "text-red-600 bg-red-50" };
+    }
+    if (asset.healthScore < 70) {
+      return { type: "warning", message: "Consider preventive maintenance soon", color: "text-yellow-600 bg-yellow-50" };
+    }
+    if (asset.healthScore >= 90) {
+      return { type: "good", message: "Asset in excellent condition", color: "text-green-600 bg-green-50" };
+    }
+    return { type: "ok", message: "Monitor during next scheduled check", color: "text-blue-600 bg-blue-50" };
+  };
+
   const statCards = [
     { label: "Total Requests", value: stats?.requests.total || 0, icon: BarChart3, color: "text-blue-600 bg-blue-100" },
     { label: "Pending", value: stats?.requests.pending || 0, icon: Clock, color: "text-yellow-600 bg-yellow-100" },
@@ -413,6 +463,10 @@ export default function ManagerDashboard() {
           <TabsTrigger value="assets" className="gap-2">
             <Settings className="w-4 h-4" />
             Assets
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="gap-2">
+            <Activity className="w-4 h-4" />
+            Analytics
           </TabsTrigger>
         </TabsList>
 
@@ -606,51 +660,224 @@ export default function ManagerDashboard() {
         </TabsContent>
 
         <TabsContent value="assets" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Asset Inventory</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Asset ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Health</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Value</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {assets.map((asset) => (
-                    <TableRow key={asset.assetId}>
-                      <TableCell className="font-mono text-xs">{asset.assetId}</TableCell>
-                      <TableCell>{asset.name}</TableCell>
-                      <TableCell className="capitalize">{asset.category}</TableCell>
-                      <TableCell>{asset.location}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full ${asset.healthScore >= 80 ? 'bg-green-500' : asset.healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                              style={{ width: `${asset.healthScore}%` }}
-                            />
-                          </div>
-                          <span className="text-xs">{asset.healthScore}%</span>
+          <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {assets.map((asset) => {
+                const recommendation = getAssetRecommendation(asset);
+                return (
+                  <Card key={asset.assetId} className="overflow-hidden">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-base">{asset.name}</CardTitle>
+                          <p className="text-xs text-muted-foreground font-mono">{asset.assetId}</p>
                         </div>
-                      </TableCell>
-                      <TableCell>
                         <Badge variant="outline" className="capitalize">{asset.status.replace('_', ' ')}</Badge>
-                      </TableCell>
-                      <TableCell>${asset.currentValue.toLocaleString()}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Health Score</span>
+                          <span className="font-semibold">{asset.healthScore}%</span>
+                        </div>
+                        <Progress 
+                          value={asset.healthScore} 
+                          className={`h-2 ${
+                            asset.healthScore >= 80 ? '[&>div]:bg-green-500' : 
+                            asset.healthScore >= 50 ? '[&>div]:bg-yellow-500' : 
+                            '[&>div]:bg-red-500'
+                          }`}
+                        />
+                      </div>
+                      
+                      <div className="text-sm space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Location</span>
+                          <span className="text-right text-xs">{asset.location.split(',')[0]}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Current Value</span>
+                          <span>${asset.currentValue.toLocaleString()}</span>
+                        </div>
+                        {asset.lastMaintenanceDate && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Last Maintenance</span>
+                            <span>{new Date(asset.lastMaintenanceDate).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className={`text-xs p-2 rounded flex items-center gap-2 ${recommendation.color}`}>
+                        <Lightbulb className="w-3 h-3" />
+                        {recommendation.message}
+                      </div>
+
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full gap-2"
+                        onClick={() => handleOpenAiSummary(asset)}
+                        data-testid={`button-ai-summary-${asset.assetId}`}
+                      >
+                        <Bot className="w-4 h-4" />
+                        AI Summary (30 days)
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-6">
+          <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Avg Turnaround</p>
+                      <h3 className="text-2xl font-bold">{stats?.avgTurnaroundHours || 0}h</h3>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-blue-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Assets Critical</p>
+                      <h3 className="text-2xl font-bold text-red-600">
+                        {assets.filter(a => a.healthScore < 50).length}
+                      </h3>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                      <AlertTriangle className="w-5 h-5 text-red-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Needs Attention</p>
+                      <h3 className="text-2xl font-bold text-yellow-600">
+                        {assets.filter(a => a.healthScore >= 50 && a.healthScore < 70).length}
+                      </h3>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                      <TrendingDown className="w-5 h-5 text-yellow-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Healthy Assets</p>
+                      <h3 className="text-2xl font-bold text-green-600">
+                        {assets.filter(a => a.healthScore >= 80).length}
+                      </h3>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5 text-green-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Lightbulb className="w-5 h-5 text-yellow-500" />
+                  AI Recommendations
+                </CardTitle>
+                <CardDescription>Actionable insights based on asset health and maintenance history</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {assets.filter(a => a.healthScore < 70).length > 0 ? (
+                    assets.filter(a => a.healthScore < 70).map((asset) => {
+                      const recommendation = getAssetRecommendation(asset);
+                      return (
+                        <div key={asset.assetId} className="flex items-start gap-4 p-4 border rounded-lg">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            asset.healthScore < 50 ? 'bg-red-100' : 'bg-yellow-100'
+                          }`}>
+                            <AlertTriangle className={`w-5 h-5 ${
+                              asset.healthScore < 50 ? 'text-red-600' : 'text-yellow-600'
+                            }`} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-semibold">{asset.name}</h4>
+                                <p className="text-sm text-muted-foreground">{asset.assetId} • {asset.location.split(',')[0]}</p>
+                              </div>
+                              <Badge variant={asset.healthScore < 50 ? "destructive" : "secondary"}>
+                                {asset.healthScore}% Health
+                              </Badge>
+                            </div>
+                            <p className="text-sm mt-2">{recommendation.message}</p>
+                            <div className="flex gap-2 mt-3">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleOpenAiSummary(asset)}
+                              >
+                                <Bot className="w-3 h-3 mr-1" />
+                                View AI Analysis
+                              </Button>
+                              <Button 
+                                size="sm"
+                                onClick={() => {
+                                  setPmAssetId(asset.assetId);
+                                  setPmDialog(true);
+                                }}
+                              >
+                                <Plus className="w-3 h-3 mr-1" />
+                                Schedule PM
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-green-500" />
+                      <p className="font-medium">All assets are in good condition!</p>
+                      <p className="text-sm">No immediate maintenance actions required.</p>
+                    </div>
+                  )}
+
+                  {requests.filter(r => r.status === 'pending').length > 0 && (
+                    <div className="border-t pt-4 mt-4">
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        Pending Requests ({requests.filter(r => r.status === 'pending').length})
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {requests.filter(r => r.status === 'pending' && r.urgency === 'immediately').length > 0 && (
+                          <span className="text-red-600 font-medium">
+                            {requests.filter(r => r.status === 'pending' && r.urgency === 'immediately').length} urgent request(s) need immediate attention.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 
@@ -949,6 +1176,41 @@ export default function ManagerDashboard() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Summary Dialog */}
+      <Dialog open={!!aiSummaryDialog} onOpenChange={(open) => !open && setAiSummaryDialog(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bot className="w-5 h-5" />
+              AI Summary: {aiSummaryDialog?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Analysis of service reports from the last 30 days
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {aiLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <span className="ml-2">Generating summary...</span>
+              </div>
+            ) : (
+              <div className="prose prose-sm max-w-none">
+                <div className="whitespace-pre-wrap bg-muted p-4 rounded-lg text-sm">
+                  {aiSummary || "No summary available."}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAiSummaryDialog(null)}>Close</Button>
+            <Button onClick={() => aiSummaryDialog && fetchAiSummary(aiSummaryDialog.assetId)} disabled={aiLoading}>
+              Refresh Summary
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

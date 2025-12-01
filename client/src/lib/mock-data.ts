@@ -23,6 +23,7 @@ export interface WorkRequest {
   denialReason?: string;
   scheduledDate?: string;
   submittedBy: string;
+  submittedById?: string;
   submittedAt: string;
   approvedBy?: string;
   approvedAt?: string;
