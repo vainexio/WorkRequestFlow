@@ -27,70 +27,99 @@ import {
 } from "lucide-react";
 
 function MarkdownRenderer({ content }: { content: string }) {
+  const parseInlineStyles = (text: string): React.ReactNode[] => {
+    const result: React.ReactNode[] = [];
+    let remaining = text;
+    let keyCounter = 0;
+    
+    while (remaining.length > 0) {
+      const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+      
+      if (boldMatch && boldMatch.index !== undefined) {
+        if (boldMatch.index > 0) {
+          result.push(<span key={keyCounter++}>{remaining.slice(0, boldMatch.index)}</span>);
+        }
+        result.push(
+          <strong key={keyCounter++} className="font-bold text-foreground">
+            {boldMatch[1]}
+          </strong>
+        );
+        remaining = remaining.slice(boldMatch.index + boldMatch[0].length);
+      } else {
+        if (remaining) {
+          result.push(<span key={keyCounter++}>{remaining}</span>);
+        }
+        break;
+      }
+    }
+    
+    return result;
+  };
+
   const rendered = useMemo(() => {
     if (!content) return null;
     
     const lines = content.split('\n');
     const elements: React.ReactNode[] = [];
-    let listItems: string[] = [];
-    let listKey = 0;
+    let currentListItems: React.ReactNode[] = [];
+    let elementKey = 0;
     
     const flushList = () => {
-      if (listItems.length > 0) {
+      if (currentListItems.length > 0) {
         elements.push(
-          <ul key={`list-${listKey++}`} className="list-disc list-inside space-y-1 my-2 ml-2">
-            {listItems.map((item, i) => (
-              <li key={i} className="text-sm">{parseInline(item)}</li>
-            ))}
+          <ul key={`list-${elementKey++}`} className="list-disc ml-5 space-y-1 my-2">
+            {currentListItems}
           </ul>
         );
-        listItems = [];
+        currentListItems = [];
       }
     };
     
-    const parseInline = (text: string): React.ReactNode => {
-      const parts: React.ReactNode[] = [];
-      let remaining = text;
-      let key = 0;
-      
-      while (remaining.length > 0) {
-        const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
-        if (boldMatch && boldMatch.index !== undefined) {
-          if (boldMatch.index > 0) {
-            parts.push(<span key={key++}>{remaining.slice(0, boldMatch.index)}</span>);
-          }
-          parts.push(<strong key={key++} className="font-semibold text-foreground">{boldMatch[1]}</strong>);
-          remaining = remaining.slice(boldMatch.index + boldMatch[0].length);
-        } else {
-          parts.push(<span key={key++}>{remaining}</span>);
-          break;
-        }
-      }
-      return parts;
-    };
-    
-    lines.forEach((line, index) => {
+    lines.forEach((line, lineIndex) => {
       const trimmed = line.trim();
       
-      if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        listItems.push(trimmed.slice(2));
-      } else if (/^\d+\.\s/.test(trimmed)) {
+      if (!trimmed) {
         flushList();
-        const content = trimmed.replace(/^\d+\.\s/, '');
+        return;
+      }
+      
+      if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        const itemContent = trimmed.slice(2);
+        currentListItems.push(
+          <li key={`item-${lineIndex}`} className="text-sm text-muted-foreground">
+            {parseInlineStyles(itemContent)}
+          </li>
+        );
+        return;
+      }
+      
+      flushList();
+      
+      if (/^\*\*[^*]+\*\*$/.test(trimmed)) {
+        const headerText = trimmed.slice(2, -2);
         elements.push(
-          <div key={index} className="my-2">
-            {parseInline(content)}
+          <h3 key={`h-${elementKey++}`} className="font-bold text-base text-foreground mt-4 mb-2 first:mt-0">
+            {headerText}
+          </h3>
+        );
+        return;
+      }
+      
+      if (/^\d+\.\s/.test(trimmed)) {
+        const itemContent = trimmed.replace(/^\d+\.\s/, '');
+        elements.push(
+          <div key={`num-${elementKey++}`} className="text-sm text-muted-foreground my-1 ml-2">
+            {parseInlineStyles(itemContent)}
           </div>
         );
-      } else if (trimmed === '') {
-        flushList();
-        elements.push(<div key={index} className="h-2" />);
-      } else {
-        flushList();
-        elements.push(
-          <p key={index} className="text-sm my-1">{parseInline(trimmed)}</p>
-        );
+        return;
       }
+      
+      elements.push(
+        <p key={`p-${elementKey++}`} className="text-sm text-muted-foreground my-1">
+          {parseInlineStyles(trimmed)}
+        </p>
+      );
     });
     
     flushList();

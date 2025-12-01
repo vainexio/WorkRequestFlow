@@ -980,25 +980,41 @@ export async function registerRoutes(
         });
       }
 
-      const workDescriptions = reports.map(r => 
-        `Date: ${r.serviceDate.toLocaleDateString()}, Description: ${r.workDescription}, Findings: ${r.reportFindings}`
-      ).join('\n\n');
+      const reportData = reports.map(r => 
+        `[${r.serviceDate.toLocaleDateString()}]
+Problem Reported: ${r.workDescription}
+Work Done/Findings: ${r.reportFindings}`
+      ).join('\n\n---\n\n');
 
-      const prompt = `Analyze the following equipment service reports and provide a **brief, concise summary** using markdown formatting.
+      const prompt = `You are a maintenance analyst. Analyze these service reports and provide a concise but detailed summary.
 
-**Reports:**
-${workDescriptions}
+SERVICE REPORTS:
+${reportData}
 
-Format your response using markdown with:
-- **Bold** for key points and section headers
-- Bullet points for lists
-- Keep each section to 2-3 short sentences maximum
+INSTRUCTIONS:
+- Use markdown formatting: **bold** for headers/emphasis, bullet points for lists
+- Be concise but include important details
+- Focus on patterns and actionable insights
 
-Provide ONLY these sections (be very concise):
-1. **Maintenance Summary** - What was done
-2. **Key Issues** - Main problems found
-3. **Health Status** - Current equipment condition (Good/Fair/Poor with brief reason)
-4. **Next Steps** - 1-2 priority recommendations`;
+PROVIDE THESE SECTIONS:
+
+**Problems Reported**
+List the main issues/complaints that triggered service calls.
+
+**Work Performed**
+Summarize what repairs/maintenance was actually done.
+
+**Recurring Issues**
+Identify any problems that appear multiple times or suggest underlying issues. If none, state "No recurring patterns detected."
+
+**Preventive Maintenance Recommendations**
+Based on the issues found, suggest specific preventive maintenance tasks that should be scheduled to avoid future breakdowns. Include:
+- What task to add
+- Suggested frequency (daily/weekly/monthly/quarterly)
+- Why it would help
+
+**Equipment Health**
+Rate as Good/Fair/Poor with a brief explanation.`;
 
       const geminiApiKey = process.env.GEMINI_API_KEY;
       if (!geminiApiKey) {
