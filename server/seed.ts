@@ -9,9 +9,9 @@ async function seedDatabase() {
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');
 
-    await User.deleteMany({});
-    await WorkRequest.deleteMany({});
-    console.log('Cleared existing data');
+    await mongoose.connection.db?.dropCollection('users').catch(() => {});
+    await mongoose.connection.db?.dropCollection('workrequests').catch(() => {});
+    console.log('Dropped existing collections');
 
     const users = await User.create([
       {
