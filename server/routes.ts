@@ -982,39 +982,27 @@ export async function registerRoutes(
 
       const reportData = reports.map(r => 
         `[${r.serviceDate.toLocaleDateString()}]
-Problem Reported: ${r.workDescription}
-Work Done/Findings: ${r.reportFindings}`
-      ).join('\n\n---\n\n');
+Problem: ${r.workDescription}
+Solution: ${r.reportFindings}`
+      ).join('\n\n');
 
-      const prompt = `You are a maintenance analyst. Analyze these service reports and provide a concise but detailed summary.
+      const prompt = `Analyze these ${reports.length} service reports and identify patterns.
 
-SERVICE REPORTS:
+REPORTS:
 ${reportData}
 
-INSTRUCTIONS:
-- Use markdown formatting: **bold** for headers/emphasis, bullet points for lists
-- Be concise but include important details
-- Focus on patterns and actionable insights
+Provide ONLY this format using markdown:
 
-PROVIDE THESE SECTIONS:
+**Recurring Problems**
+- List each recurring or notable problem as a bullet point
+- Be specific about what keeps breaking or failing
 
-**Problems Reported**
-List the main issues/complaints that triggered service calls.
+**Recurring Solutions**
+- List the solutions/fixes that were applied
+- Match them to the problems above where applicable
 
-**Work Performed**
-Summarize what repairs/maintenance was actually done.
-
-**Recurring Issues**
-Identify any problems that appear multiple times or suggest underlying issues. If none, state "No recurring patterns detected."
-
-**Preventive Maintenance Recommendations**
-Based on the issues found, suggest specific preventive maintenance tasks that should be scheduled to avoid future breakdowns. Include:
-- What task to add
-- Suggested frequency (daily/weekly/monthly/quarterly)
-- Why it would help
-
-**Equipment Health**
-Rate as Good/Fair/Poor with a brief explanation.`;
+**PM Suggestion**
+One brief sentence recommending a preventive maintenance task to reduce these issues.`;
 
       const geminiApiKey = process.env.GEMINI_API_KEY;
       if (!geminiApiKey) {

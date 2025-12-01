@@ -592,7 +592,7 @@ export default function TechnicianDashboard() {
                   <div className="text-sm space-y-1">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Current Value</span>
-                      <span>${asset.currentValue.toLocaleString()}</span>
+                      <span>₱{asset.currentValue.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Depreciation</span>
@@ -650,8 +650,8 @@ export default function TechnicianDashboard() {
                       <p className="text-sm text-muted-foreground">{report.workDescription}</p>
                       <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
                         <span>Man Hours: {report.manHours.toFixed(1)}</span>
-                        <span>Parts: ${report.totalPartsCost}</span>
-                        <span>Labor: ${report.laborCost}</span>
+                        <span>Parts: ₱{report.totalPartsCost}</span>
+                        <span>Labor: ₱{report.laborCost}</span>
                       </div>
                     </div>
                   ))}
@@ -755,7 +755,7 @@ export default function TechnicianDashboard() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Labor Cost ($)</label>
+                  <label className="text-sm font-medium">Labor Cost (₱)</label>
                   <Input 
                     type="number"
                     step="0.01"

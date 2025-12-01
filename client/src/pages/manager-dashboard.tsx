@@ -696,7 +696,7 @@ export default function ManagerDashboard() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Current Value</span>
-                          <span>${asset.currentValue.toLocaleString()}</span>
+                          <span>₱{asset.currentValue.toLocaleString()}</span>
                         </div>
                         {asset.lastMaintenanceDate && (
                           <div className="flex justify-between">
