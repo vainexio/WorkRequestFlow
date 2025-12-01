@@ -581,6 +581,91 @@ export async function registerRoutes(
     }
   });
 
+  // Get service reports for specific asset
+  app.get("/api/assets/:assetId/service-reports", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { assetId } = req.params;
+      const reports = await ServiceReport.find({ assetId }).sort({ createdAt: -1 });
+      
+      const formatted = reports.map(report => ({
+        _id: report._id,
+        reportId: report.reportId,
+        tswrNo: report.tswrNo,
+        workRequestId: report.workRequestId,
+        assetId: report.assetId,
+        assetName: report.assetName,
+        assetCode: report.assetCode,
+        location: report.location,
+        workDescription: report.workDescription,
+        remarks: report.remarks,
+        urgency: report.urgency,
+        workStartTime: report.workStartTime,
+        workEndTime: report.workEndTime,
+        manHours: report.manHours,
+        laborCost: report.laborCost,
+        partsMaterials: report.partsMaterials,
+        totalPartsCost: report.totalPartsCost,
+        serviceType: report.serviceType,
+        hoursDown: report.hoursDown,
+        reportFindings: report.reportFindings,
+        serviceDate: report.serviceDate,
+        preparedBy: report.preparedBy,
+        preparedByName: report.preparedByName,
+        notedByName: report.notedByName,
+        acknowledgedByName: report.acknowledgedByName,
+        acknowledgedAt: report.acknowledgedAt,
+        createdAt: report.createdAt,
+      }));
+      
+      return res.json(formatted);
+    } catch (error) {
+      console.error("Get asset service reports error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get requests for specific asset
+  app.get("/api/assets/:assetId/requests", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { assetId } = req.params;
+      const requests = await WorkRequest.find({ assetId }).sort({ createdAt: -1 });
+      
+      const formatted = requests.map(req => ({
+        id: req.requestId,
+        tswrNo: req.tswrNo,
+        assetId: req.assetId,
+        assetName: req.assetName,
+        location: req.location,
+        workDescription: req.workDescription,
+        urgency: req.urgency,
+        disruptsOperation: req.disruptsOperation,
+        status: req.status,
+        scheduledDate: req.scheduledDate,
+        submittedBy: req.submittedByName,
+        submittedById: req.submittedBy,
+        submittedAt: req.createdAt,
+        approvedBy: req.approvedByName,
+        approvedAt: req.approvedAt,
+        assignedTo: req.assignedToName,
+        resolvedAt: req.resolvedAt,
+        serviceReportId: req.serviceReportId,
+      }));
+      
+      return res.json(formatted);
+    } catch (error) {
+      console.error("Get asset requests error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Service Report Routes
   app.get("/api/service-reports", async (req, res) => {
     if (!req.session.userId) {

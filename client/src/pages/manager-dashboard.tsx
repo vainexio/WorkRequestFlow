@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { WorkRequest, User, Asset, PreventiveMaintenance, DashboardStats, getStatusColor, getStatusLabel, getUrgencyLabel, UrgencyType } from "@/lib/mock-data";
+import { WorkRequest, User, Asset, PreventiveMaintenance, DashboardStats, ServiceReport, getStatusColor, getStatusLabel, getUrgencyLabel, UrgencyType } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,8 +29,113 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   BarChart3, Clock, CheckCircle2, Users, Loader2, XCircle, Calendar, 
   Plus, Trash2, Edit, Wrench, Settings, ClipboardList, UserPlus, Bot,
-  AlertTriangle, TrendingUp, TrendingDown, Activity, Lightbulb
+  AlertTriangle, TrendingUp, TrendingDown, Activity, Lightbulb, FileText, Eye
 } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useMemo } from "react";
+
+function MarkdownRenderer({ content }: { content: string }) {
+  const parseInlineStyles = (text: string): React.ReactNode[] => {
+    const result: React.ReactNode[] = [];
+    let remaining = text;
+    let keyCounter = 0;
+    
+    while (remaining.length > 0) {
+      const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+      
+      if (boldMatch && boldMatch.index !== undefined) {
+        if (boldMatch.index > 0) {
+          result.push(<span key={keyCounter++}>{remaining.slice(0, boldMatch.index)}</span>);
+        }
+        result.push(
+          <strong key={keyCounter++} className="font-bold text-foreground">
+            {boldMatch[1]}
+          </strong>
+        );
+        remaining = remaining.slice(boldMatch.index + boldMatch[0].length);
+      } else {
+        if (remaining) {
+          result.push(<span key={keyCounter++}>{remaining}</span>);
+        }
+        break;
+      }
+    }
+    
+    return result;
+  };
+
+  const rendered = useMemo(() => {
+    if (!content) return null;
+    
+    const lines = content.split('\n');
+    const elements: React.ReactNode[] = [];
+    let currentListItems: React.ReactNode[] = [];
+    let elementKey = 0;
+    
+    const flushList = () => {
+      if (currentListItems.length > 0) {
+        elements.push(
+          <ul key={`list-${elementKey++}`} className="list-disc ml-5 space-y-1 my-2">
+            {currentListItems}
+          </ul>
+        );
+        currentListItems = [];
+      }
+    };
+    
+    lines.forEach((line, lineIndex) => {
+      const trimmed = line.trim();
+      
+      if (!trimmed) {
+        flushList();
+        return;
+      }
+      
+      if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        const itemContent = trimmed.slice(2);
+        currentListItems.push(
+          <li key={`item-${lineIndex}`} className="text-sm text-muted-foreground">
+            {parseInlineStyles(itemContent)}
+          </li>
+        );
+        return;
+      }
+      
+      flushList();
+      
+      if (/^\*\*[^*]+\*\*$/.test(trimmed)) {
+        const headerText = trimmed.slice(2, -2);
+        elements.push(
+          <h3 key={`h-${elementKey++}`} className="font-bold text-base text-foreground mt-4 mb-2 first:mt-0">
+            {headerText}
+          </h3>
+        );
+        return;
+      }
+      
+      if (/^\d+\.\s/.test(trimmed)) {
+        const itemContent = trimmed.replace(/^\d+\.\s/, '');
+        elements.push(
+          <div key={`num-${elementKey++}`} className="text-sm text-muted-foreground my-1 ml-2">
+            {parseInlineStyles(itemContent)}
+          </div>
+        );
+        return;
+      }
+      
+      elements.push(
+        <p key={`p-${elementKey++}`} className="text-sm text-muted-foreground my-1">
+          {parseInlineStyles(trimmed)}
+        </p>
+      );
+    });
+    
+    flushList();
+    return elements;
+  }, [content]);
+  
+  return <div className="space-y-1">{rendered}</div>;
+}
 
 interface Technician {
   id: string;
@@ -70,6 +175,13 @@ export default function ManagerDashboard() {
   const [aiSummary, setAiSummary] = useState<string>("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSummaryCache, setAiSummaryCache] = useState<Record<string, string>>({});
+  
+  const [assetDetailDialog, setAssetDetailDialog] = useState<Asset | null>(null);
+  const [assetServiceReports, setAssetServiceReports] = useState<ServiceReport[]>([]);
+  const [assetRequests, setAssetRequests] = useState<WorkRequest[]>([]);
+  const [assetDetailLoading, setAssetDetailLoading] = useState(false);
+  
+  const [requestDetailDialog, setRequestDetailDialog] = useState<WorkRequest | null>(null);
 
   const { data: requests = [], isLoading } = useQuery<WorkRequest[]>({
     queryKey: ["requests-all"],
@@ -393,6 +505,40 @@ export default function ManagerDashboard() {
     }
   };
 
+  const fetchAssetDetails = async (assetId: string) => {
+    setAssetDetailLoading(true);
+    try {
+      const [reportsRes, requestsRes] = await Promise.all([
+        fetch(`/api/assets/${assetId}/service-reports`, { credentials: "include" }),
+        fetch(`/api/assets/${assetId}/requests`, { credentials: "include" })
+      ]);
+      
+      if (reportsRes.ok) {
+        const reports = await reportsRes.json();
+        setAssetServiceReports(reports);
+      }
+      if (requestsRes.ok) {
+        const reqs = await requestsRes.json();
+        setAssetRequests(reqs);
+      }
+    } catch (error) {
+      console.error("Failed to fetch asset details:", error);
+    } finally {
+      setAssetDetailLoading(false);
+    }
+  };
+
+  const handleOpenAssetDetail = (asset: Asset) => {
+    setAssetDetailDialog(asset);
+    setAssetServiceReports([]);
+    setAssetRequests([]);
+    fetchAssetDetails(asset.assetId);
+  };
+
+  const handleOpenRequestDetail = (request: WorkRequest) => {
+    setRequestDetailDialog(request);
+  };
+
   const getAssetRecommendation = (asset: Asset) => {
     if (asset.healthScore < 50) {
       return { type: "critical", message: "Schedule immediate inspection and maintenance", color: "text-red-600 bg-red-50" };
@@ -519,6 +665,14 @@ export default function ManagerDashboard() {
                       <TableCell className="text-right space-x-2">
                         {req.status === 'pending' && (
                           <>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleOpenRequestDetail(req)}
+                              data-testid={`button-view-${req.id}`}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
                             <Button 
                               variant="outline" 
                               size="sm"
@@ -711,16 +865,28 @@ export default function ManagerDashboard() {
                         {recommendation.message}
                       </div>
 
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="w-full gap-2"
-                        onClick={() => handleOpenAiSummary(asset)}
-                        data-testid={`button-ai-summary-${asset.assetId}`}
-                      >
-                        <Bot className="w-4 h-4" />
-                        AI Summary (30 days)
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1 gap-2"
+                          onClick={() => handleOpenAssetDetail(asset)}
+                          data-testid={`button-view-asset-${asset.assetId}`}
+                        >
+                          <Eye className="w-4 h-4" />
+                          View Details
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1 gap-2"
+                          onClick={() => handleOpenAiSummary(asset)}
+                          data-testid={`button-ai-summary-${asset.assetId}`}
+                        >
+                          <Bot className="w-4 h-4" />
+                          AI Summary
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 );
@@ -1196,10 +1362,12 @@ export default function ManagerDashboard() {
                 <span className="ml-2">Generating summary...</span>
               </div>
             ) : (
-              <div className="prose prose-sm max-w-none">
-                <div className="whitespace-pre-wrap bg-muted p-4 rounded-lg text-sm">
-                  {aiSummary || "No summary available."}
-                </div>
+              <div className="bg-muted p-4 rounded-lg">
+                {aiSummary ? (
+                  <MarkdownRenderer content={aiSummary} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">No summary available.</p>
+                )}
               </div>
             )}
           </div>
@@ -1207,6 +1375,163 @@ export default function ManagerDashboard() {
             <Button variant="outline" onClick={() => setAiSummaryDialog(null)}>Close</Button>
             <Button onClick={() => aiSummaryDialog && fetchAiSummary(aiSummaryDialog.assetId)} disabled={aiLoading}>
               Refresh Summary
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Asset Detail Dialog */}
+      <Dialog open={!!assetDetailDialog} onOpenChange={(open) => !open && setAssetDetailDialog(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5" />
+              {assetDetailDialog?.name}
+            </DialogTitle>
+            <DialogDescription>
+              {assetDetailDialog?.assetId} - {assetDetailDialog?.location}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            {assetDetailLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div>
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <ClipboardList className="w-4 h-4" />
+                    Pending/Ongoing Requests ({assetRequests.filter(r => ['pending', 'scheduled', 'ongoing'].includes(r.status)).length})
+                  </h4>
+                  {assetRequests.filter(r => ['pending', 'scheduled', 'ongoing'].includes(r.status)).length > 0 ? (
+                    <div className="space-y-2">
+                      {assetRequests.filter(r => ['pending', 'scheduled', 'ongoing'].includes(r.status)).map(req => (
+                        <div key={req.id} className="border rounded-lg p-3 space-y-1">
+                          <div className="flex justify-between items-start">
+                            <span className="font-mono text-xs">{req.tswrNo}</span>
+                            <Badge variant="outline" className={getStatusColor(req.status)}>
+                              {getStatusLabel(req.status)}
+                            </Badge>
+                          </div>
+                          <p className="text-sm">{req.workDescription}</p>
+                          <div className="flex gap-4 text-xs text-muted-foreground">
+                            <span>Urgency: {getUrgencyLabel(req.urgency)}</span>
+                            {req.assignedTo && <span>Assigned: {req.assignedTo}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No pending or ongoing requests.</p>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Service Reports ({assetServiceReports.length})
+                  </h4>
+                  {assetServiceReports.length > 0 ? (
+                    <div className="space-y-2">
+                      {assetServiceReports.map(report => (
+                        <div key={report._id} className="border rounded-lg p-3 space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="font-mono text-xs">{report.reportId}</span>
+                              <span className="text-xs text-muted-foreground ml-2">
+                                {new Date(report.serviceDate).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <Badge variant="outline" className="capitalize">{report.serviceType}</Badge>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm"><span className="font-medium">Problem:</span> {report.workDescription}</p>
+                            <p className="text-sm"><span className="font-medium">Work Done:</span> {report.reportFindings}</p>
+                          </div>
+                          <div className="flex gap-4 text-xs text-muted-foreground">
+                            <span>By: {report.preparedByName}</span>
+                            <span>Hours: {report.manHours.toFixed(1)}</span>
+                            <span>Cost: ₱{(report.laborCost + report.totalPartsCost).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No service reports found.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssetDetailDialog(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Request Detail Dialog */}
+      <Dialog open={!!requestDetailDialog} onOpenChange={(open) => !open && setRequestDetailDialog(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="w-5 h-5" />
+              Request Details
+            </DialogTitle>
+            <DialogDescription>
+              {requestDetailDialog?.tswrNo}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">Asset:</span>
+                <p className="font-medium">{requestDetailDialog?.assetName}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Location:</span>
+                <p className="font-medium">{requestDetailDialog?.location}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Urgency:</span>
+                <Badge variant="secondary" className="mt-1">
+                  {requestDetailDialog && getUrgencyLabel(requestDetailDialog.urgency)}
+                </Badge>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Disrupts Operation:</span>
+                <p className="font-medium">{requestDetailDialog?.disruptsOperation ? "Yes" : "No"}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Submitted By:</span>
+                <p className="font-medium">{requestDetailDialog?.submittedBy}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Submitted At:</span>
+                <p className="font-medium">
+                  {requestDetailDialog?.submittedAt && new Date(requestDetailDialog.submittedAt).toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div>
+              <span className="text-sm text-muted-foreground">Work Description:</span>
+              <div className="bg-muted p-3 rounded-lg mt-1">
+                <p className="text-sm">{requestDetailDialog?.workDescription}</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRequestDetailDialog(null)}>Close</Button>
+            <Button 
+              onClick={() => {
+                if (requestDetailDialog) {
+                  setRequestDetailDialog(null);
+                  setApproveDialog(requestDetailDialog);
+                  setUrgency(requestDetailDialog.urgency);
+                }
+              }}
+            >
+              Approve & Assign
             </Button>
           </DialogFooter>
         </DialogContent>
