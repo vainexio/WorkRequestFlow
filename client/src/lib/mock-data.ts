@@ -1,69 +1,191 @@
-export type RequestStatus = "pending" | "in_progress" | "completed" | "rejected";
-export type Priority = "low" | "medium" | "high" | "critical";
+export type RequestStatus = 
+  | "pending" 
+  | "denied" 
+  | "scheduled" 
+  | "ongoing" 
+  | "cannot_resolve" 
+  | "resolved" 
+  | "closed";
+
+export type UrgencyType = "standstill" | "immediately" | "on_occasion" | "during_maintenance";
 
 export interface WorkRequest {
   id: string;
-  title: string;
-  description: string;
+  tswrNo: string;
+  assetId: string;
+  assetName: string;
   location: string;
+  workDescription: string;
+  urgency: UrgencyType;
+  disruptsOperation: boolean;
+  attachmentUrl?: string;
   status: RequestStatus;
-  priority: Priority;
+  denialReason?: string;
+  scheduledDate?: string;
   submittedBy: string;
   submittedAt: string;
+  approvedBy?: string;
+  approvedAt?: string;
   assignedTo?: string;
+  resolvedAt?: string;
+  closedAt?: string;
+  requesterFeedback?: string;
+  requesterConfirmedAt?: string;
+  turnaroundTime?: number;
+  serviceReportId?: string;
 }
 
-export const mockRequests: WorkRequest[] = [
-  {
-    id: "REQ-1001",
-    title: "AC Unit Malfunction in Server Room",
-    description: "The AC unit in the main server room is making a loud rattling noise and not cooling effectively. Temperature is rising.",
-    location: "Building A, Floor 2, Server Room",
-    status: "in_progress",
-    priority: "critical",
-    submittedBy: "Sarah Connor",
-    submittedAt: "2023-10-25T09:30:00Z",
-    assignedTo: "Technician User",
-  },
-  {
-    id: "REQ-1002",
-    title: "Flickering Lights in Conference Room B",
-    description: "The overhead LED panels are flickering intermittently, causing distraction during meetings.",
-    location: "Building B, Floor 1, Conf Room B",
-    status: "pending",
-    priority: "medium",
-    submittedBy: "Michael Scott",
-    submittedAt: "2023-10-26T14:15:00Z",
-  },
-  {
-    id: "REQ-1003",
-    title: "Leaking Faucet in Kitchenette",
-    description: "The hot water tap is dripping constantly.",
-    location: "Building A, Floor 3, Kitchen",
-    status: "completed",
-    priority: "low",
-    submittedBy: "Pam Beesly",
-    submittedAt: "2023-10-24T11:00:00Z",
-    assignedTo: "Technician User",
-  },
-  {
-    id: "REQ-1004",
-    title: "Broken Office Chair",
-    description: "Gas lift mechanism is broken, chair sinks when sat on.",
-    location: "Building C, Floor 2, Desk 42",
-    status: "rejected",
-    priority: "low",
-    submittedBy: "Dwight Schrute",
-    submittedAt: "2023-10-23T08:45:00Z",
-  },
-  {
-    id: "REQ-1005",
-    title: "Projector Connection Issue",
-    description: "HDMI port on the main projector seems loose, signal cuts out.",
-    location: "Building B, Floor 1, Main Hall",
-    status: "pending",
-    priority: "high",
-    submittedBy: "Jim Halpert",
-    submittedAt: "2023-10-27T10:00:00Z",
-  },
-];
+export interface Asset {
+  _id: string;
+  assetId: string;
+  name: string;
+  category: "equipment" | "machine" | "furniture";
+  location: string;
+  purchaseDate: string;
+  purchaseCost: number;
+  depreciationRate: number;
+  currentValue: number;
+  healthScore: number;
+  status: "operational" | "under_maintenance" | "out_of_service";
+  maintenanceHistory: MaintenanceRecord[];
+  lastMaintenanceDate?: string;
+  nextScheduledMaintenance?: string;
+}
+
+export interface MaintenanceRecord {
+  date: string;
+  type: "preventive" | "corrective" | "emergency";
+  description: string;
+  technicianName: string;
+  cost: number;
+  partsReplaced?: string[];
+}
+
+export interface PartMaterial {
+  partName: string;
+  partNo?: string;
+  quantity: number;
+  cost: number;
+}
+
+export interface ServiceReport {
+  _id: string;
+  reportId: string;
+  tswrNo: string;
+  workRequestId?: string;
+  assetId: string;
+  assetName: string;
+  assetCode?: string;
+  location: string;
+  workDescription: string;
+  remarks?: string;
+  urgency: UrgencyType;
+  workStartTime: string;
+  workEndTime: string;
+  manHours: number;
+  laborCost: number;
+  partsMaterials: PartMaterial[];
+  totalPartsCost: number;
+  serviceType: "planned" | "unplanned";
+  hoursDown: number;
+  reportFindings: string;
+  serviceDate: string;
+  preparedBy: string;
+  preparedByName: string;
+  notedByName?: string;
+  acknowledgedByName?: string;
+  acknowledgedAt?: string;
+  createdAt: string;
+}
+
+export interface PreventiveMaintenance {
+  _id: string;
+  scheduleId: string;
+  assetId: string;
+  assetCode: string;
+  assetName: string;
+  description: string;
+  frequency: "daily" | "weekly" | "monthly" | "quarterly" | "semi_annual" | "annual";
+  nextDueDate: string;
+  lastCompletedDate?: string;
+  assignedTo?: string;
+  assignedToName?: string;
+  tasks: string[];
+  estimatedDuration: number;
+  isActive: boolean;
+  createdByName: string;
+}
+
+export interface User {
+  _id: string;
+  username: string;
+  role: "employee" | "technician" | "manager";
+  name: string;
+  createdAt: string;
+}
+
+export interface DashboardStats {
+  requests: {
+    total: number;
+    pending: number;
+    scheduled: number;
+    ongoing: number;
+    resolved: number;
+    closed: number;
+    denied: number;
+    cannotResolve: number;
+  };
+  assets: {
+    total: number;
+    operational: number;
+    underMaintenance: number;
+  };
+  technicians: number;
+  avgTurnaroundHours: number;
+}
+
+export const getStatusColor = (status: RequestStatus): string => {
+  const colors: Record<RequestStatus, string> = {
+    pending: "bg-blue-500/10 text-blue-600 border-blue-200",
+    denied: "bg-red-500/10 text-red-600 border-red-200",
+    scheduled: "bg-slate-500/10 text-slate-600 border-slate-200",
+    ongoing: "bg-yellow-500/10 text-yellow-600 border-yellow-200",
+    cannot_resolve: "bg-purple-500/10 text-purple-600 border-purple-200",
+    resolved: "bg-green-500/10 text-green-600 border-green-200",
+    closed: "bg-gray-500/10 text-gray-600 border-gray-200",
+  };
+  return colors[status] || "bg-gray-500/10 text-gray-600 border-gray-200";
+};
+
+export const getStatusLabel = (status: RequestStatus): string => {
+  const labels: Record<RequestStatus, string> = {
+    pending: "Pending",
+    denied: "Denied",
+    scheduled: "Scheduled",
+    ongoing: "Ongoing",
+    cannot_resolve: "Cannot Resolve",
+    resolved: "Resolved",
+    closed: "Closed",
+  };
+  return labels[status] || status;
+};
+
+export const getUrgencyLabel = (urgency: UrgencyType): string => {
+  const labels: Record<UrgencyType, string> = {
+    standstill: "Stand Still (Not Urgent)",
+    immediately: "Immediately",
+    on_occasion: "On Occasion",
+    during_maintenance: "During Maintenance",
+  };
+  return labels[urgency] || urgency;
+};
+
+export const getUrgencyColor = (urgency: UrgencyType): string => {
+  const colors: Record<UrgencyType, string> = {
+    standstill: "bg-gray-100 text-gray-700",
+    immediately: "bg-red-100 text-red-700",
+    on_occasion: "bg-orange-100 text-orange-700",
+    during_maintenance: "bg-blue-100 text-blue-700",
+  };
+  return colors[urgency] || "bg-gray-100 text-gray-700";
+};
