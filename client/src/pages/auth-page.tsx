@@ -6,9 +6,8 @@ import { useAuth } from "@/lib/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/generated_images/abstract_geometric_blue_tech_logo.png";
 
 const formSchema = z.object({
@@ -18,6 +17,7 @@ const formSchema = z.object({
 
 export default function AuthPage() {
   const { login, isLoading } = useAuth();
+  const { toast } = useToast();
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -28,12 +28,19 @@ export default function AuthPage() {
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    await login(values.username);
+    try {
+      await login(values.username, values.password);
+    } catch (error: any) {
+      toast({
+        title: "Login Failed",
+        description: error.message || "Invalid username or password",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
     <div className="min-h-screen w-full flex">
-      {/* Left Side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center lg:text-left space-y-2">
@@ -98,15 +105,15 @@ export default function AuthPage() {
               <div className="grid grid-cols-3 gap-2 text-center text-xs text-muted-foreground">
                  <div className="p-2 rounded border bg-muted/30">
                     <span className="font-semibold block text-foreground">Manager</span>
-                    user: manager
+                    <span className="text-[10px]">manager / password123</span>
                  </div>
                  <div className="p-2 rounded border bg-muted/30">
                     <span className="font-semibold block text-foreground">Technician</span>
-                    user: tech
+                    <span className="text-[10px]">tech / password123</span>
                  </div>
                  <div className="p-2 rounded border bg-muted/30">
                     <span className="font-semibold block text-foreground">Employee</span>
-                    user: employee
+                    <span className="text-[10px]">employee / password123</span>
                  </div>
               </div>
 
@@ -115,7 +122,6 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* Right Side - Visual */}
       <div className="hidden lg:flex w-1/2 bg-slate-950 relative overflow-hidden items-center justify-center">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/40 via-slate-950 to-slate-950 z-10"></div>
         <div className="relative z-20 text-center space-y-6 max-w-lg px-6">

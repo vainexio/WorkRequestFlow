@@ -1,30 +1,64 @@
-import { useState } from "react";
-import { mockRequests, WorkRequest, RequestStatus } from "@/lib/mock-data";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { WorkRequest, RequestStatus } from "@/lib/mock-data";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { MapPin, Calendar, AlertCircle } from "lucide-react";
+import { MapPin, Calendar, AlertCircle, Loader2 } from "lucide-react";
 
 export default function TechnicianDashboard() {
-  // Filter to show only requests assigned to "Technician User" for demo
-  const [requests, setRequests] = useState<WorkRequest[]>(
-    mockRequests.filter(r => r.assignedTo === "Technician User" || r.assignedTo === undefined && r.priority === 'critical')
-  );
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: requests = [], isLoading } = useQuery<WorkRequest[]>({
+    queryKey: ["requests"],
+    queryFn: async () => {
+      const response = await fetch("/api/requests", {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch requests");
+      return response.json();
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: RequestStatus }) => {
+      const response = await fetch(`/api/requests/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status }),
+      });
+      if (!response.ok) throw new Error("Failed to update status");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["requests"] });
+      toast({
+        title: "Status Updated",
+        description: "Request status has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update status. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleStatusChange = (id: string, newStatus: RequestStatus) => {
-    const updatedRequests = requests.map(req => 
-      req.id === id ? { ...req, status: newStatus } : req
-    );
-    setRequests(updatedRequests);
-    
-    toast({
-      title: "Status Updated",
-      description: `Request ${id} marked as ${newStatus.replace('_', ' ')}`,
-    });
+    updateStatusMutation.mutate({ id, status: newStatus });
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -39,7 +73,7 @@ export default function TechnicianDashboard() {
             No tasks assigned currently. Good job!
           </div>
         ) : requests.map((req) => (
-          <Card key={req.id} className="overflow-hidden group">
+          <Card key={req.id} className="overflow-hidden group" data-testid={`card-request-${req.id}`}>
             <div className={`h-1.5 w-full ${
               req.priority === 'critical' ? 'bg-red-500' : 
               req.priority === 'high' ? 'bg-orange-500' : 
@@ -51,7 +85,7 @@ export default function TechnicianDashboard() {
                   <div className="flex items-start justify-between">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="font-mono">{req.id}</Badge>
+                        <Badge variant="outline" className="font-mono" data-testid={`text-id-${req.id}`}>{req.id}</Badge>
                         <Badge className={
                           req.priority === 'critical' ? 'bg-red-100 text-red-700 hover:bg-red-100' : 
                           req.priority === 'high' ? 'bg-orange-100 text-orange-700 hover:bg-orange-100' : 
@@ -60,11 +94,11 @@ export default function TechnicianDashboard() {
                           {req.priority} priority
                         </Badge>
                       </div>
-                      <h3 className="text-xl font-semibold">{req.title}</h3>
+                      <h3 className="text-xl font-semibold" data-testid={`text-title-${req.id}`}>{req.title}</h3>
                     </div>
                   </div>
                   
-                  <p className="text-muted-foreground bg-muted/30 p-4 rounded-md">
+                  <p className="text-muted-foreground bg-muted/30 p-4 rounded-md" data-testid={`text-description-${req.id}`}>
                     {req.description}
                   </p>
 
@@ -90,10 +124,11 @@ export default function TechnicianDashboard() {
                     <Select 
                       value={req.status} 
                       onValueChange={(v: RequestStatus) => handleStatusChange(req.id, v)}
+                      disabled={updateStatusMutation.isPending}
                     >
                       <SelectTrigger className={
                         req.status === 'completed' ? 'border-green-500 text-green-600 bg-green-50' : ''
-                      }>
+                      } data-testid={`select-status-${req.id}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

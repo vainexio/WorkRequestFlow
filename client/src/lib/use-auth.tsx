@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { useLocation } from "wouter";
 
 export type UserRole = "employee" | "technician" | "manager";
@@ -12,7 +12,7 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -21,40 +21,70 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [, setLocation] = useLocation();
 
-  const login = async (username: string) => {
-    setIsLoading(true);
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+  useEffect(() => {
+    checkAuth();
+  }, []);
 
-    let role: UserRole = "employee";
-    let name = "Employee User";
+  const checkAuth = async () => {
+    try {
+      const response = await fetch("/api/auth/me", {
+        credentials: "include",
+      });
 
-    if (username.toLowerCase().includes("tech")) {
-      role = "technician";
-      name = "Technician User";
-    } else if (username.toLowerCase().includes("manager") || username.toLowerCase().includes("admin")) {
-      role = "manager";
-      name = "Manager User";
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+      }
+    } catch (error) {
+      console.error("Auth check failed:", error);
+    } finally {
+      setIsLoading(false);
     }
-
-    const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      username,
-      role,
-      name,
-    };
-
-    setUser(newUser);
-    setIsLoading(false);
-    setLocation("/dashboard");
   };
 
-  const logout = () => {
-    setUser(null);
-    setLocation("/auth");
+  const login = async (username: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Login failed");
+      }
+
+      const userData = await response.json();
+      setUser(userData);
+      setLocation("/dashboard");
+    } catch (error) {
+      console.error("Login error:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setUser(null);
+      setLocation("/auth");
+    }
   };
 
   return (
