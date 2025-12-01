@@ -1,4 +1,6 @@
 import { Switch, Route, useLocation } from "wouter";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { AuthProvider, useAuth } from "@/lib/use-auth";
 import { Toaster } from "@/components/ui/toaster";
 import AuthPage from "@/pages/auth-page";
@@ -8,7 +10,7 @@ import TechnicianDashboard from "@/pages/technician-dashboard";
 import Layout from "@/components/layout";
 import NotFound from "@/pages/not-found";
 
-function ProtectedRoute({ component: Component, allowedRoles }: any) {
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -18,10 +20,6 @@ function ProtectedRoute({ component: Component, allowedRoles }: any) {
     setLocation("/auth");
     return null;
   }
-
-  // Simple role check - in a real app this would be more robust
-  // For this mockup, if a role is provided, we check it. 
-  // If not, any logged in user can access (but we route them to their specific dashboard anyway)
   
   return (
     <Layout>
@@ -33,7 +31,6 @@ function ProtectedRoute({ component: Component, allowedRoles }: any) {
 function Router() {
   const { user } = useAuth();
 
-  // Helper to route to the correct dashboard based on role
   const DashboardRouter = () => {
     if (!user) return null;
     if (user.role === "manager") return <ManagerDashboard />;
@@ -49,9 +46,6 @@ function Router() {
         <ProtectedRoute component={DashboardRouter} />
       </Route>
       
-      {/* Sub-routes for specific views could be added here, 
-          but for this mockup we'll stick to the main dashboard views 
-      */}
       <Route path="/dashboard/*">
         <ProtectedRoute component={DashboardRouter} />
       </Route>
@@ -67,10 +61,12 @@ function Router() {
 
 function App() {
   return (
-    <AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
         <Toaster />
         <Router />
-    </AuthProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 
