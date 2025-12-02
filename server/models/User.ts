@@ -8,6 +8,8 @@ export interface IUser extends Document {
   role: UserRole;
   name: string;
   createdAt: Date;
+  isArchived: boolean;
+  archivedAt?: Date;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -34,6 +36,13 @@ const UserSchema = new Schema<IUser>({
   createdAt: {
     type: Date,
     default: Date.now,
+  },
+  isArchived: {
+    type: Boolean,
+    default: false,
+  },
+  archivedAt: {
+    type: Date,
   },
 });
 

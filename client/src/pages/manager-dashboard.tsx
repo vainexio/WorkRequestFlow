@@ -28,7 +28,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { 
   BarChart3, Clock, CheckCircle2, Users, Loader2, XCircle, Calendar, 
-  Plus, Trash2, Edit, Wrench, Settings, ClipboardList, UserPlus, Bot,
+  Plus, Archive, Edit, Wrench, Settings, ClipboardList, UserPlus, Bot,
   AlertTriangle, TrendingUp, TrendingDown, Activity, Lightbulb, FileText, Eye
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -142,6 +142,22 @@ interface Technician {
   name: string;
   username: string;
 }
+
+const getRoleColor = (role: string): string => {
+  const colors: Record<string, string> = {
+    manager: "bg-green-500/15 text-green-700 border-green-300",
+    technician: "bg-yellow-500/15 text-yellow-700 border-yellow-300",
+    employee: "bg-blue-500/15 text-blue-700 border-blue-300",
+  };
+  return colors[role] || "bg-gray-500/15 text-gray-700 border-gray-300";
+};
+
+const getUserStatusColor = (isActive: boolean = true): string => {
+  if (isActive) {
+    return "bg-green-500/15 text-green-700 border-green-300";
+  }
+  return "bg-red-500/15 text-red-700 border-red-300";
+};
 
 export default function ManagerDashboard() {
   const { toast } = useToast();
@@ -352,10 +368,10 @@ export default function ManagerDashboard() {
     },
   });
 
-  const deleteUserMutation = useMutation({
+  const archiveUserMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/users/${id}`, {
-        method: "DELETE",
+      const response = await fetch(`/api/users/${id}/archive`, {
+        method: "PATCH",
         credentials: "include",
       });
       if (!response.ok) {
@@ -367,7 +383,7 @@ export default function ManagerDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       queryClient.invalidateQueries({ queryKey: ["technicians"] });
-      toast({ title: "User Deleted", description: "User has been deleted." });
+      toast({ title: "User Archived", description: "User has been archived successfully." });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -773,17 +789,23 @@ export default function ManagerDashboard() {
                     <TableHead>Username</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.map((user) => (
-                    <TableRow key={user._id}>
+                    <TableRow key={user._id} data-testid={`row-user-${user._id}`}>
                       <TableCell className="font-mono">{user.username}</TableCell>
                       <TableCell>{user.name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="capitalize">{user.role}</Badge>
+                        <Badge variant="outline" className={`capitalize ${getRoleColor(user.role)}`}>{user.role}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={getUserStatusColor(!user.isArchived)}>
+                          {user.isArchived ? "Archived" : "Active"}
+                        </Badge>
                       </TableCell>
                       <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
                       <TableCell className="text-right space-x-2">
@@ -791,16 +813,18 @@ export default function ManagerDashboard() {
                           variant="ghost" 
                           size="sm"
                           onClick={() => openEditUser(user)}
+                          data-testid={`button-edit-user-${user._id}`}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          className="text-red-600"
-                          onClick={() => deleteUserMutation.mutate(user._id)}
+                          className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          onClick={() => archiveUserMutation.mutate(user._id)}
+                          data-testid={`button-archive-user-${user._id}`}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Archive className="w-4 h-4" />
                         </Button>
                       </TableCell>
                     </TableRow>

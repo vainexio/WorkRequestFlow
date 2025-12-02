@@ -123,6 +123,8 @@ export interface User {
   role: "employee" | "technician" | "manager";
   name: string;
   createdAt: string;
+  isArchived?: boolean;
+  archivedAt?: string;
 }
 
 export interface DashboardStats {
@@ -173,7 +175,7 @@ export const getStatusLabel = (status: RequestStatus): string => {
 
 export const getUrgencyLabel = (urgency: UrgencyType): string => {
   const labels: Record<UrgencyType, string> = {
-    standstill: "Stand Still (Not Urgent)",
+    standstill: "Stand Still",
     immediately: "Immediately",
     on_occasion: "On Occasion",
     during_maintenance: "During Maintenance",

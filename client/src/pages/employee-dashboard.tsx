@@ -196,7 +196,7 @@ export default function EmployeeDashboard() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="standstill">Stand Still (Not Urgent - For Schedule)</SelectItem>
+                    <SelectItem value="standstill">Stand Still (For Schedule)</SelectItem>
                     <SelectItem value="immediately">Immediately (Must be done ASAP)</SelectItem>
                     <SelectItem value="on_occasion">On Occasion (During shutdown/holidays)</SelectItem>
                     <SelectItem value="during_maintenance">During Maintenance (Regular schedule)</SelectItem>

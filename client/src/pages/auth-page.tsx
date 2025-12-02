@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/generated_images/abstract_geometric_blue_tech_logo.png";
 
 const formSchema = z.object({
-  username: z.string().min(1, "Username is required"),
+  email: z.string().min(1, "Email or username is required"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -22,18 +22,18 @@ export default function AuthPage() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      await login(values.username, values.password);
+      await login(values.email, values.password);
     } catch (error: any) {
       toast({
         title: "Login Failed",
-        description: error.message || "Invalid username or password",
+        description: error.message || "Invalid email or password",
         variant: "destructive",
       });
     }
@@ -57,12 +57,12 @@ export default function AuthPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
-                name="username"
+                name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel>Email / Username</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. manager, tech, employee" {...field} className="h-11" data-testid="input-username" />
+                      <Input type="text" placeholder="Enter your email or username" {...field} className="h-11" data-testid="input-email" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

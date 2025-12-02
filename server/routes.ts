@@ -15,16 +15,21 @@ export async function registerRoutes(
   // Auth Routes
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const { email, username, password } = req.body;
+      const loginIdentifier = email || username;
 
-      if (!username || !password) {
-        return res.status(400).json({ message: "Username and password required" });
+      if (!loginIdentifier || !password) {
+        return res.status(400).json({ message: "Email and password required" });
       }
 
-      const user = await User.findOne({ username: username.toLowerCase() });
+      const user = await User.findOne({ username: loginIdentifier.toLowerCase() });
 
       if (!user || user.password !== password) {
         return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      if (user.isArchived) {
+        return res.status(401).json({ message: "This account has been archived" });
       }
 
       req.session.userId = user._id.toString();
@@ -911,7 +916,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Only managers can view all users" });
       }
 
-      const users = await User.find().select('-password').sort({ createdAt: -1 });
+      const users = await User.find().select('-password').sort({ isArchived: 1, createdAt: -1 });
       return res.json(users);
     } catch (error) {
       console.error("Get users error:", error);
@@ -925,7 +930,7 @@ export async function registerRoutes(
     }
 
     try {
-      const technicians = await User.find({ role: 'technician' }).select('name username _id');
+      const technicians = await User.find({ role: 'technician', isArchived: { $ne: true } }).select('name username _id');
       return res.json(technicians.map(t => ({
         id: t._id,
         name: t.name,
@@ -1033,6 +1038,41 @@ export async function registerRoutes(
       return res.json({ message: "User deleted successfully" });
     } catch (error) {
       console.error("Delete user error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/users/:id/archive", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = await User.findById(req.session.userId);
+      if (!currentUser || currentUser.role !== 'manager') {
+        return res.status(403).json({ message: "Only managers can archive users" });
+      }
+
+      if (req.params.id === req.session.userId) {
+        return res.status(400).json({ message: "Cannot archive your own account" });
+      }
+
+      const user = await User.findById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      user.isArchived = true;
+      user.archivedAt = new Date();
+      await user.save();
+
+      return res.json({ 
+        message: "User archived successfully",
+        id: user._id,
+        isArchived: user.isArchived,
+      });
+    } catch (error) {
+      console.error("Archive user error:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   });
