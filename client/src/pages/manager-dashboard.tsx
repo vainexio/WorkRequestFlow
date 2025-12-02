@@ -173,7 +173,7 @@ export default function ManagerDashboard() {
   const [denyReason, setDenyReason] = useState("");
 
   const [userDialog, setUserDialog] = useState<{ mode: 'create' | 'edit'; user?: User } | null>(null);
-  const [newUsername, setNewUsername] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState<"employee" | "technician" | "manager">("employee");
@@ -320,7 +320,7 @@ export default function ManagerDashboard() {
   });
 
   const createUserMutation = useMutation({
-    mutationFn: async (data: { username: string; password: string; name: string; role: string }) => {
+    mutationFn: async (data: { email: string; password: string; name: string; role: string }) => {
       const response = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -430,7 +430,7 @@ export default function ManagerDashboard() {
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
     createUserMutation.mutate({
-      username: newUsername,
+      email: newEmail,
       password: newPassword,
       name: newName,
       role: newRole,
@@ -470,7 +470,7 @@ export default function ManagerDashboard() {
   };
 
   const resetUserForm = () => {
-    setNewUsername("");
+    setNewEmail("");
     setNewPassword("");
     setNewName("");
     setNewRole("employee");
@@ -1204,12 +1204,14 @@ export default function ManagerDashboard() {
             <div className="space-y-4 py-4">
               {userDialog?.mode === 'create' && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Username</label>
+                  <label className="text-sm font-medium">Email</label>
                   <Input 
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="user@example.com"
                     required
-                    data-testid="input-username"
+                    data-testid="input-email"
                   />
                 </div>
               )}

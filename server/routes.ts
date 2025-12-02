@@ -15,14 +15,13 @@ export async function registerRoutes(
   // Auth Routes
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { email, username, password } = req.body;
-      const loginIdentifier = email || username;
+      const { email, password } = req.body;
 
-      if (!loginIdentifier || !password) {
+      if (!email || !password) {
         return res.status(400).json({ message: "Email and password required" });
       }
 
-      const user = await User.findOne({ username: loginIdentifier.toLowerCase() });
+      const user = await User.findOne({ email: email.toLowerCase() });
 
       if (!user || user.password !== password) {
         return res.status(401).json({ message: "Invalid credentials" });
@@ -33,11 +32,12 @@ export async function registerRoutes(
       }
 
       req.session.userId = user._id.toString();
-      req.session.username = user.username;
+      req.session.email = user.email;
       req.session.role = user.role;
 
       return res.json({
         id: user._id,
+        email: user.email,
         username: user.username,
         role: user.role,
         name: user.name,
@@ -71,6 +71,7 @@ export async function registerRoutes(
 
       return res.json({
         id: user._id,
+        email: user.email,
         username: user.username,
         role: user.role,
         name: user.name,
@@ -953,19 +954,20 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Only managers can create users" });
       }
 
-      const { username, password, role, name } = req.body;
+      const { email, username, password, role, name } = req.body;
 
-      if (!username || !password || !role || !name) {
-        return res.status(400).json({ message: "All fields are required" });
+      if (!email || !password || !role || !name) {
+        return res.status(400).json({ message: "Email, password, role, and name are required" });
       }
 
-      const existingUser = await User.findOne({ username: username.toLowerCase() });
+      const existingUser = await User.findOne({ email: email.toLowerCase() });
       if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
+        return res.status(400).json({ message: "Email already exists" });
       }
 
       const user = await User.create({
-        username: username.toLowerCase(),
+        email: email.toLowerCase(),
+        username: username || email.split('@')[0],
         password,
         role,
         name,
@@ -973,6 +975,7 @@ export async function registerRoutes(
 
       return res.status(201).json({
         id: user._id,
+        email: user.email,
         username: user.username,
         role: user.role,
         name: user.name,
@@ -1009,6 +1012,7 @@ export async function registerRoutes(
 
       return res.json({
         id: user._id,
+        email: user.email,
         username: user.username,
         role: user.role,
         name: user.name,

@@ -5,6 +5,7 @@ export type UserRole = "employee" | "technician" | "manager";
 
 export interface User {
   id: string;
+  email: string;
   username: string;
   role: UserRole;
   name: string;

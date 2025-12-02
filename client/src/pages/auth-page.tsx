@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/generated_images/abstract_geometric_blue_tech_logo.png";
 
 const formSchema = z.object({
-  email: z.string().min(1, "Email or username is required"),
+  email: z.string().email("Please enter a valid email address"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -60,9 +60,9 @@ export default function AuthPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email / Username</FormLabel>
+                    <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input type="text" placeholder="Enter your email or username" {...field} className="h-11" data-testid="input-email" />
+                      <Input type="email" placeholder="Enter your email address" {...field} className="h-11" data-testid="input-email" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -105,15 +105,15 @@ export default function AuthPage() {
               <div className="grid grid-cols-3 gap-2 text-center text-xs text-muted-foreground">
                  <div className="p-2 rounded border bg-muted/30">
                     <span className="font-semibold block text-foreground">Manager</span>
-                    <span className="text-[10px]">manager / password123</span>
+                    <span className="text-[10px]">manager@workquest.com</span>
                  </div>
                  <div className="p-2 rounded border bg-muted/30">
                     <span className="font-semibold block text-foreground">Technician</span>
-                    <span className="text-[10px]">tech / password123</span>
+                    <span className="text-[10px]">tech@workquest.com</span>
                  </div>
                  <div className="p-2 rounded border bg-muted/30">
                     <span className="font-semibold block text-foreground">Employee</span>
-                    <span className="text-[10px]">employee / password123</span>
+                    <span className="text-[10px]">employee@workquest.com</span>
                  </div>
               </div>
 
