@@ -20,30 +20,35 @@ async function seedDatabase() {
 
     const users = await User.create([
       {
+        email: 'manager@workquest.com',
         username: 'manager',
         password: 'password123',
         role: 'manager',
         name: 'Manager User',
       },
       {
+        email: 'tech@workquest.com',
         username: 'tech',
         password: 'password123',
         role: 'technician',
         name: 'Technician User',
       },
       {
+        email: 'employee@workquest.com',
         username: 'employee',
         password: 'password123',
         role: 'employee',
         name: 'Employee User',
       },
       {
+        email: 'sarah@workquest.com',
         username: 'sarah',
         password: 'password123',
         role: 'employee',
         name: 'Sarah Connor',
       },
       {
+        email: 'john@workquest.com',
         username: 'john',
         password: 'password123',
         role: 'technician',
@@ -51,7 +56,7 @@ async function seedDatabase() {
       },
     ]);
 
-    console.log('Created users:', users.map(u => u.username));
+    console.log('Created users:', users.map(u => u.email));
 
     const assets = await Asset.create([
       {
