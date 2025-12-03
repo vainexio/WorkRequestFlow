@@ -1185,8 +1185,10 @@ One brief sentence recommending a preventive maintenance task to reduce these is
       const totalAssets = await Asset.countDocuments();
       const operationalAssets = await Asset.countDocuments({ status: 'operational' });
       const underMaintenanceAssets = await Asset.countDocuments({ status: 'under_maintenance' });
+      const assetsAtRisk = await Asset.countDocuments({ healthScore: { $lt: 50 } });
 
-      const technicians = await User.countDocuments({ role: 'technician' });
+      const technicians = await User.countDocuments({ role: 'technician', isArchived: { $ne: true } });
+      const activeTechnicians = await User.countDocuments({ role: 'technician', isArchived: { $ne: true } });
 
       const closedWithTime = await WorkRequest.find({ 
         status: 'closed', 
@@ -1195,6 +1197,8 @@ One brief sentence recommending a preventive maintenance task to reduce these is
       const avgTurnaround = closedWithTime.length > 0 
         ? Math.round(closedWithTime.reduce((sum, r) => sum + (r.turnaroundTime || 0), 0) / closedWithTime.length)
         : 0;
+
+      const activeWorkOrders = scheduledRequests + ongoingRequests;
 
       return res.json({
         requests: {
@@ -1211,12 +1215,82 @@ One brief sentence recommending a preventive maintenance task to reduce these is
           total: totalAssets,
           operational: operationalAssets,
           underMaintenance: underMaintenanceAssets,
+          atRisk: assetsAtRisk,
         },
         technicians,
+        activeTechnicians,
+        activeWorkOrders,
         avgTurnaroundHours: avgTurnaround,
       });
     } catch (error) {
       console.error("Get stats error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Hotspot Data - Equipment with highest repeated failures in last 7 days
+  app.get("/api/hotspots", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = await User.findById(req.session.userId);
+      if (!user || user.role !== 'manager') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      
+      const recentRequests = await WorkRequest.find({
+        createdAt: { $gte: sevenDaysAgo }
+      });
+
+      const assetFailures: Record<string, { 
+        assetId: string; 
+        assetName: string; 
+        location: string;
+        count: number;
+        assignedTechnicians: Set<string>;
+        requests: any[];
+      }> = {};
+
+      recentRequests.forEach(req => {
+        if (!assetFailures[req.assetId]) {
+          assetFailures[req.assetId] = {
+            assetId: req.assetId,
+            assetName: req.assetName,
+            location: req.location,
+            count: 0,
+            assignedTechnicians: new Set(),
+            requests: []
+          };
+        }
+        assetFailures[req.assetId].count++;
+        if (req.assignedToName) {
+          assetFailures[req.assetId].assignedTechnicians.add(req.assignedToName);
+        }
+        assetFailures[req.assetId].requests.push({
+          id: req.requestId,
+          description: req.workDescription,
+          status: req.status,
+          date: req.createdAt
+        });
+      });
+
+      const hotspots = Object.values(assetFailures)
+        .map(item => ({
+          ...item,
+          technicianCount: item.assignedTechnicians.size,
+          technicians: Array.from(item.assignedTechnicians),
+          assignedTechnicians: undefined
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+      return res.json(hotspots);
+    } catch (error) {
+      console.error("Get hotspots error:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   });

@@ -142,9 +142,27 @@ export interface DashboardStats {
     total: number;
     operational: number;
     underMaintenance: number;
+    atRisk: number;
   };
   technicians: number;
+  activeTechnicians: number;
+  activeWorkOrders: number;
   avgTurnaroundHours: number;
+}
+
+export interface HotspotItem {
+  assetId: string;
+  assetName: string;
+  location: string;
+  count: number;
+  technicianCount: number;
+  technicians: string[];
+  requests: {
+    id: string;
+    description: string;
+    status: string;
+    date: string;
+  }[];
 }
 
 export const getStatusColor = (status: RequestStatus): string => {

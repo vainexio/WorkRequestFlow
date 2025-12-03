@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
 import {
   WorkRequest,
   User,
@@ -7,6 +8,7 @@ import {
   PreventiveMaintenance,
   DashboardStats,
   ServiceReport,
+  HotspotItem,
   getStatusColor,
   getStatusLabel,
   getUrgencyLabel,
@@ -50,31 +52,33 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  BarChart3,
-  Clock,
+  ClipboardList,
+  Wrench,
+  AlertTriangle,
   CheckCircle2,
   Users,
   Loader2,
-  XCircle,
   Calendar,
   Plus,
   Archive,
   Edit,
-  Wrench,
   Settings,
-  ClipboardList,
   UserPlus,
   Bot,
-  AlertTriangle,
   TrendingUp,
   TrendingDown,
   Activity,
   Lightbulb,
   FileText,
   Eye,
+  Clock,
+  Flame,
+  ChevronRight,
+  UserCheck,
+  ClipboardCheck,
+  ShieldAlert,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useMemo } from "react";
 
 function MarkdownRenderer({ content }: { content: string }) {
   const parseInlineStyles = (text: string): React.ReactNode[] => {
@@ -223,7 +227,7 @@ const getUserStatusColor = (isActive: boolean = true): string => {
 export default function ManagerDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("requests");
+  const [activeTab, setActiveTab] = useState("overview");
 
   const [approveDialog, setApproveDialog] = useState<WorkRequest | null>(null);
   const [denyDialog, setDenyDialog] = useState<WorkRequest | null>(null);
@@ -271,6 +275,11 @@ export default function ManagerDashboard() {
 
   const [requestDetailDialog, setRequestDetailDialog] =
     useState<WorkRequest | null>(null);
+
+  const [workOrderDialog, setWorkOrderDialog] = useState(false);
+  const [woAssetId, setWoAssetId] = useState("");
+  const [woDescription, setWoDescription] = useState("");
+  const [woUrgency, setWoUrgency] = useState<UrgencyType>("standstill");
 
   const { data: requests = [], isLoading } = useQuery<WorkRequest[]>({
     queryKey: ["requests-all"],
@@ -332,6 +341,15 @@ export default function ManagerDashboard() {
     },
   });
 
+  const { data: hotspots = [] } = useQuery<HotspotItem[]>({
+    queryKey: ["hotspots"],
+    queryFn: async () => {
+      const response = await fetch("/api/hotspots", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch hotspots");
+      return response.json();
+    },
+  });
+
   const approveMutation = useMutation({
     mutationFn: async ({
       id,
@@ -356,6 +374,7 @@ export default function ManagerDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["requests-all"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
+      queryClient.invalidateQueries({ queryKey: ["hotspots"] });
       setApproveDialog(null);
       resetApproveForm();
       toast({
@@ -451,6 +470,7 @@ export default function ManagerDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       queryClient.invalidateQueries({ queryKey: ["technicians"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
       setUserDialog(null);
       resetUserForm();
       toast({
@@ -739,32 +759,7 @@ export default function ManagerDashboard() {
     };
   };
 
-  const statCards = [
-    {
-      label: "Total Requests",
-      value: stats?.requests.total || 0,
-      icon: BarChart3,
-      color: "text-blue-600 bg-blue-100",
-    },
-    {
-      label: "Pending",
-      value: stats?.requests.pending || 0,
-      icon: Clock,
-      color: "text-yellow-600 bg-yellow-100",
-    },
-    {
-      label: "Closed",
-      value: stats?.requests.closed || 0,
-      icon: CheckCircle2,
-      color: "text-green-600 bg-green-100",
-    },
-    {
-      label: "Technicians",
-      value: stats?.technicians || 0,
-      icon: Users,
-      color: "text-purple-600 bg-purple-100",
-    },
-  ];
+  const pendingRequests = requests.filter((r) => r.status === "pending");
 
   if (isLoading) {
     return (
@@ -775,64 +770,427 @@ export default function ManagerDashboard() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-foreground">
-          Manager Dashboard
+        <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground">
+          Dashboard
         </h1>
         <p className="text-muted-foreground mt-1">
-          Manage requests, users, and preventive maintenance schedules.
+          Overview of work requests, assets, and maintenance operations.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((stat, i) => (
-          <Card key={i}>
-            <CardContent className="p-6 flex items-center justify-between">
+      {/* Main Tally Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-l-4 border-l-blue-500">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  {stat.label}
+                <p className="text-xs md:text-sm font-medium text-muted-foreground">
+                  Open Requests
                 </p>
                 <h3
-                  className="text-3xl font-bold mt-1"
-                  data-testid={`stat-${stat.label.toLowerCase().replace(" ", "-")}`}
+                  className="text-2xl md:text-3xl font-bold mt-1"
+                  data-testid="stat-open-requests"
                 >
-                  {stat.value}
+                  {stats?.requests.pending || 0}
                 </h3>
               </div>
-              <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center ${stat.color}`}
-              >
-                <stat.icon className="w-6 h-6" />
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                <ClipboardList className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
               </div>
-            </CardContent>
-          </Card>
-        ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-yellow-500">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs md:text-sm font-medium text-muted-foreground">
+                  Active Work Orders
+                </p>
+                <h3
+                  className="text-2xl md:text-3xl font-bold mt-1"
+                  data-testid="stat-active-orders"
+                >
+                  {stats?.activeWorkOrders || 0}
+                </h3>
+              </div>
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-yellow-100 flex items-center justify-center">
+                <Wrench className="w-5 h-5 md:w-6 md:h-6 text-yellow-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-red-500">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs md:text-sm font-medium text-muted-foreground">
+                  Assets at Risk
+                </p>
+                <h3
+                  className="text-2xl md:text-3xl font-bold mt-1 text-red-600"
+                  data-testid="stat-assets-risk"
+                >
+                  {stats?.assets.atRisk || 0}
+                </h3>
+              </div>
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-red-100 flex items-center justify-center">
+                <ShieldAlert className="w-5 h-5 md:w-6 md:h-6 text-red-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-green-500">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs md:text-sm font-medium text-muted-foreground">
+                  Closed Orders
+                </p>
+                <h3
+                  className="text-2xl md:text-3xl font-bold mt-1"
+                  data-testid="stat-closed-orders"
+                >
+                  {stats?.requests.closed || 0}
+                </h3>
+              </div>
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 md:w-6 md:h-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
+      {/* Main Content Grid */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Hotspot Card */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Flame className="w-5 h-5 text-orange-500" />
+                <CardTitle className="text-lg">Equipment Hotspots</CardTitle>
+              </div>
+              <Badge variant="secondary" className="text-xs">
+                Last 7 days
+              </Badge>
+            </div>
+            <CardDescription>
+              Equipment with the highest repeated failures
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {hotspots.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Flame className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                <p>No equipment failures reported in the last 7 days</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {hotspots.map((hotspot, index) => (
+                  <div
+                    key={hotspot.assetId}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
+                    data-testid={`hotspot-${hotspot.assetId}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                          index === 0
+                            ? "bg-red-100 text-red-700"
+                            : index === 1
+                              ? "bg-orange-100 text-orange-700"
+                              : "bg-yellow-100 text-yellow-700"
+                        }`}
+                      >
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{hotspot.assetName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {hotspot.location}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="font-bold text-lg">{hotspot.count}</p>
+                        <p className="text-xs text-muted-foreground">
+                          failures
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Users className="w-4 h-4" />
+                        <span className="text-sm font-medium">
+                          {hotspot.technicianCount}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions Card */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary" />
+              Quick Actions
+            </CardTitle>
+            <CardDescription>Common management tasks</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Button
+              variant="outline"
+              className="w-full justify-between group hover:border-primary"
+              onClick={() => setWorkOrderDialog(true)}
+              data-testid="quick-action-create-wo"
+            >
+              <span className="flex items-center gap-2">
+                <Plus className="w-4 h-4" />
+                Create Work Order
+              </span>
+              <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full justify-between group hover:border-primary"
+              onClick={() => setActiveTab("requests")}
+              data-testid="quick-action-assign-tech"
+            >
+              <span className="flex items-center gap-2">
+                <UserCheck className="w-4 h-4" />
+                Assign Technician
+              </span>
+              <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full justify-between group hover:border-primary"
+              onClick={() => setActiveTab("requests")}
+              data-testid="quick-action-approve"
+            >
+              <span className="flex items-center gap-2">
+                <ClipboardCheck className="w-4 h-4" />
+                Approve Requests
+              </span>
+              {pendingRequests.length > 0 && (
+                <Badge variant="destructive" className="text-xs">
+                  {pendingRequests.length}
+                </Badge>
+              )}
+            </Button>
+
+            <div className="pt-2 border-t mt-3">
+              <Button
+                variant="ghost"
+                className="w-full justify-between text-sm text-muted-foreground hover:text-foreground"
+                onClick={() => setUserDialog({ mode: "create" })}
+                data-testid="quick-action-add-user"
+              >
+                <span className="flex items-center gap-2">
+                  <UserPlus className="w-4 h-4" />
+                  Add New User
+                </span>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                className="w-full justify-between text-sm text-muted-foreground hover:text-foreground"
+                onClick={() => setPmDialog(true)}
+                data-testid="quick-action-add-pm"
+              >
+                <span className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Schedule PM
+                </span>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Secondary Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                <Users className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Technicians</p>
+                <p className="text-xl font-bold">{stats?.technicians || 0}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Avg Turnaround</p>
+                <p className="text-xl font-bold">
+                  {stats?.avgTurnaroundHours || 0}h
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Healthy Assets</p>
+                <p className="text-xl font-bold">
+                  {assets.filter((a) => a.healthScore >= 80).length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                <TrendingDown className="w-5 h-5 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Need Attention</p>
+                <p className="text-xl font-bold">
+                  {
+                    assets.filter(
+                      (a) => a.healthScore >= 50 && a.healthScore < 70,
+                    ).length
+                  }
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabs Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
+          <TabsTrigger value="overview" className="gap-2">
+            <Activity className="w-4 h-4" />
+            <span className="hidden sm:inline">Overview</span>
+          </TabsTrigger>
           <TabsTrigger value="requests" className="gap-2">
             <ClipboardList className="w-4 h-4" />
-            Requests
+            <span className="hidden sm:inline">Requests</span>
           </TabsTrigger>
           <TabsTrigger value="pm" className="gap-2">
-            <Wrench className="w-4 h-4" />
-            PM Schedules
+            <Calendar className="w-4 h-4" />
+            <span className="hidden sm:inline">PM</span>
           </TabsTrigger>
           <TabsTrigger value="users" className="gap-2">
             <Users className="w-4 h-4" />
-            Users
+            <span className="hidden sm:inline">Users</span>
           </TabsTrigger>
           <TabsTrigger value="assets" className="gap-2">
             <Settings className="w-4 h-4" />
-            Assets
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="gap-2">
-            <Activity className="w-4 h-4" />
-            Analytics
+            <span className="hidden sm:inline">Assets</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="overview" className="mt-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Recent Pending Requests */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Recent Pending Requests</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {pendingRequests.length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-4">
+                    No pending requests
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingRequests.slice(0, 5).map((req) => (
+                      <div
+                        key={req.id}
+                        className="flex items-center justify-between p-3 rounded-lg border"
+                      >
+                        <div>
+                          <p className="font-medium text-sm">{req.assetName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {req.tswrNo}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setApproveDialog(req);
+                            setUrgency(req.urgency);
+                          }}
+                        >
+                          Review
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Upcoming PM */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Upcoming Maintenance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {pmSchedules.length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-4">
+                    No scheduled maintenance
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {pmSchedules.slice(0, 5).map((pm) => (
+                      <div
+                        key={pm.scheduleId}
+                        className="flex items-center justify-between p-3 rounded-lg border"
+                      >
+                        <div>
+                          <p className="font-medium text-sm">{pm.assetName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Due:{" "}
+                            {new Date(pm.nextDueDate).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="capitalize text-xs">
+                          {pm.frequency.replace("_", " ")}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         <TabsContent value="requests" className="mt-6">
           <Card>
@@ -840,118 +1198,120 @@ export default function ManagerDashboard() {
               <CardTitle>All Work Requests</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>TSWR No.</TableHead>
-                    <TableHead>Asset</TableHead>
-                    <TableHead>Urgency</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                    <TableHead>Feedback</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {requests.map((req) => (
-                    <TableRow
-                      key={req.id}
-                      data-testid={`row-request-${req.id}`}
-                    >
-                      <TableCell className="font-mono text-xs">
-                        {req.tswrNo}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{req.assetName}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {req.location}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="capitalize">
-                          {getUrgencyLabel(req.urgency)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={getStatusColor(req.status)}
-                        >
-                          {getStatusLabel(req.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {req.assignedTo || (
-                          <span className="text-muted-foreground italic">
-                            Unassigned
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {req.requesterFeedback ? (
-                          <span className="text-sm text-green-600">
-                            {req.requesterFeedback.substring(0, 30)}...
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        {req.status === "pending" && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenRequestDetail(req)}
-                              data-testid={`button-view-${req.id}`}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setApproveDialog(req);
-                                setUrgency(req.urgency);
-                              }}
-                              data-testid={`button-approve-${req.id}`}
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-red-600"
-                              onClick={() => setDenyDialog(req)}
-                              data-testid={`button-deny-${req.id}`}
-                            >
-                              Deny
-                            </Button>
-                          </>
-                        )}
-                        {req.status === "resolved" &&
-                          req.requesterConfirmedAt && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setCloseDialog(req)}
-                              data-testid={`button-close-${req.id}`}
-                            >
-                              Close
-                            </Button>
-                          )}
-                        {req.status === "closed" && req.turnaroundTime && (
-                          <span className="text-xs text-muted-foreground">
-                            {req.turnaroundTime}h turnaround
-                          </span>
-                        )}
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>TSWR No.</TableHead>
+                      <TableHead>Asset</TableHead>
+                      <TableHead>Urgency</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Assigned To</TableHead>
+                      <TableHead>Feedback</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {requests.map((req) => (
+                      <TableRow
+                        key={req.id}
+                        data-testid={`row-request-${req.id}`}
+                      >
+                        <TableCell className="font-mono text-xs">
+                          {req.tswrNo}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{req.assetName}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {req.location}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="capitalize">
+                            {getUrgencyLabel(req.urgency)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={getStatusColor(req.status)}
+                          >
+                            {getStatusLabel(req.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {req.assignedTo || (
+                            <span className="text-muted-foreground italic">
+                              Unassigned
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {req.requesterFeedback ? (
+                            <span className="text-sm text-green-600">
+                              {req.requesterFeedback.substring(0, 30)}...
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          {req.status === "pending" && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenRequestDetail(req)}
+                                data-testid={`button-view-${req.id}`}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setApproveDialog(req);
+                                  setUrgency(req.urgency);
+                                }}
+                                data-testid={`button-approve-${req.id}`}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-red-600"
+                                onClick={() => setDenyDialog(req)}
+                                data-testid={`button-deny-${req.id}`}
+                              >
+                                Deny
+                              </Button>
+                            </>
+                          )}
+                          {req.status === "resolved" &&
+                            req.requesterConfirmedAt && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCloseDialog(req)}
+                                data-testid={`button-close-${req.id}`}
+                              >
+                                Close
+                              </Button>
+                            )}
+                          {req.status === "closed" && req.turnaroundTime && (
+                            <span className="text-xs text-muted-foreground">
+                              {req.turnaroundTime}h turnaround
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -970,36 +1330,38 @@ export default function ManagerDashboard() {
               </Button>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Schedule ID</TableHead>
-                    <TableHead>Asset</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Frequency</TableHead>
-                    <TableHead>Next Due</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pmSchedules.map((pm) => (
-                    <TableRow key={pm.scheduleId}>
-                      <TableCell className="font-mono text-xs">
-                        {pm.scheduleId}
-                      </TableCell>
-                      <TableCell>{pm.assetName}</TableCell>
-                      <TableCell>{pm.description}</TableCell>
-                      <TableCell className="capitalize">
-                        {pm.frequency.replace("_", " ")}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(pm.nextDueDate).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>{pm.assignedToName || "-"}</TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Schedule ID</TableHead>
+                      <TableHead>Asset</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Frequency</TableHead>
+                      <TableHead>Next Due</TableHead>
+                      <TableHead>Assigned To</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {pmSchedules.map((pm) => (
+                      <TableRow key={pm.scheduleId}>
+                        <TableCell className="font-mono text-xs">
+                          {pm.scheduleId}
+                        </TableCell>
+                        <TableCell>{pm.assetName}</TableCell>
+                        <TableCell>{pm.description}</TableCell>
+                        <TableCell className="capitalize">
+                          {pm.frequency.replace("_", " ")}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(pm.nextDueDate).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>{pm.assignedToName || "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1018,413 +1380,198 @@ export default function ManagerDashboard() {
               </Button>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user) => (
-                    <TableRow
-                      key={user._id}
-                      data-testid={`row-user-${user._id}`}
-                    >
-                      <TableCell className="font-mono">
-                        {user.username}
-                      </TableCell>
-                      <TableCell>{user.name}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={`capitalize ${getRoleColor(user.role)}`}
-                        >
-                          {user.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={getUserStatusColor(!user.isArchived)}
-                        >
-                          {user.isArchived ? "Archived" : "Active"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(user.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditUser(user)}
-                          data-testid={`button-edit-user-${user._id}`}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                          onClick={() => archiveUserMutation.mutate(user._id)}
-                          data-testid={`button-archive-user-${user._id}`}
-                        >
-                          <Archive className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Username</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow
+                        key={user._id}
+                        data-testid={`row-user-${user._id}`}
+                      >
+                        <TableCell className="font-mono">
+                          {user.username}
+                        </TableCell>
+                        <TableCell>{user.name}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={`capitalize ${getRoleColor(user.role)}`}
+                          >
+                            {user.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={getUserStatusColor(!user.isArchived)}
+                          >
+                            {user.isArchived ? "Archived" : "Active"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(user.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditUser(user)}
+                            data-testid={`button-edit-user-${user._id}`}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                            onClick={() => archiveUserMutation.mutate(user._id)}
+                            data-testid={`button-archive-user-${user._id}`}
+                          >
+                            <Archive className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="assets" className="mt-6">
-          <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {assets.map((asset) => {
-                const recommendation = getAssetRecommendation(asset);
-                return (
-                  <Card key={asset.assetId} className="overflow-hidden">
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-base">
-                            {asset.name}
-                          </CardTitle>
-                          <p className="text-xs text-muted-foreground font-mono">
-                            {asset.assetId}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className="capitalize">
-                          {asset.status.replace("_", " ")}
-                        </Badge>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {assets.map((asset) => {
+              const recommendation = getAssetRecommendation(asset);
+              return (
+                <Card key={asset.assetId} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-base">
+                          {asset.name}
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {asset.assetId}
+                        </p>
                       </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Health Score</span>
-                          <span className="font-semibold">
-                            {asset.healthScore}%
-                          </span>
-                        </div>
-                        <Progress
-                          value={asset.healthScore}
-                          className={`h-2 ${
-                            asset.healthScore >= 80
-                              ? "[&>div]:bg-green-500"
-                              : asset.healthScore >= 50
-                                ? "[&>div]:bg-yellow-500"
-                                : "[&>div]:bg-red-500"
-                          }`}
-                        />
+                      <Badge variant="outline" className="capitalize">
+                        {asset.status.replace("_", " ")}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Health Score</span>
+                        <span className="font-semibold">
+                          {asset.healthScore}%
+                        </span>
                       </div>
+                      <Progress
+                        value={asset.healthScore}
+                        className={`h-2 ${
+                          asset.healthScore >= 80
+                            ? "[&>div]:bg-green-500"
+                            : asset.healthScore >= 50
+                              ? "[&>div]:bg-yellow-500"
+                              : "[&>div]:bg-red-500"
+                        }`}
+                      />
+                    </div>
 
-                      <div className="text-sm space-y-1">
+                    <div className="text-sm space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Location</span>
+                        <span className="text-right text-xs">
+                          {asset.location.split(",")[0]}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          Current Value
+                        </span>
+                        <span>₱{asset.currentValue.toLocaleString()}</span>
+                      </div>
+                      {asset.lastMaintenanceDate && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">
-                            Location
+                            Last Maintenance
                           </span>
-                          <span className="text-right text-xs">
-                            {asset.location.split(",")[0]}
+                          <span>
+                            {new Date(
+                              asset.lastMaintenanceDate,
+                            ).toLocaleDateString()}
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">
-                            Current Value
-                          </span>
-                          <span>₱{asset.currentValue.toLocaleString()}</span>
-                        </div>
-                        {asset.lastMaintenanceDate && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              Last Maintenance
-                            </span>
-                            <span>
-                              {new Date(
-                                asset.lastMaintenanceDate,
-                              ).toLocaleDateString()}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                      )}
+                    </div>
 
-                      <div
-                        className={`text-xs p-2 rounded flex items-center gap-2 ${recommendation.color}`}
+                    <div
+                      className={`text-xs p-2 rounded flex items-center gap-2 ${recommendation.color}`}
+                    >
+                      <Lightbulb className="w-3 h-3" />
+                      {recommendation.message}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 gap-2"
+                        onClick={() => handleOpenAssetDetail(asset)}
+                        data-testid={`button-view-asset-${asset.assetId}`}
                       >
-                        <Lightbulb className="w-3 h-3" />
-                        {recommendation.message}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 gap-2"
-                          onClick={() => handleOpenAssetDetail(asset)}
-                          data-testid={`button-view-asset-${asset.assetId}`}
-                        >
-                          <Eye className="w-4 h-4" />
-                          View Details
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 gap-2"
-                          onClick={() => handleOpenAiSummary(asset)}
-                          data-testid={`button-ai-summary-${asset.assetId}`}
-                        >
-                          <Bot className="w-4 h-4" />
-                          AI Summary
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="analytics" className="mt-6">
-          <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Avg Turnaround
-                      </p>
-                      <h3 className="text-2xl font-bold">
-                        {stats?.avgTurnaroundHours || 0}h
-                      </h3>
+                        <Eye className="w-4 h-4" />
+                        View Details
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 gap-2"
+                        onClick={() => handleOpenAiSummary(asset)}
+                        data-testid={`button-ai-summary-${asset.assetId}`}
+                      >
+                        <Bot className="w-4 h-4" />
+                        AI Summary
+                      </Button>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                      <Clock className="w-5 h-5 text-blue-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Assets Critical
-                      </p>
-                      <h3 className="text-2xl font-bold text-red-600">
-                        {assets.filter((a) => a.healthScore < 50).length}
-                      </h3>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                      <AlertTriangle className="w-5 h-5 text-red-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Needs Attention
-                      </p>
-                      <h3 className="text-2xl font-bold text-yellow-600">
-                        {
-                          assets.filter(
-                            (a) => a.healthScore >= 50 && a.healthScore < 70,
-                          ).length
-                        }
-                      </h3>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                      <TrendingDown className="w-5 h-5 text-yellow-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Healthy Assets
-                      </p>
-                      <h3 className="text-2xl font-bold text-green-600">
-                        {assets.filter((a) => a.healthScore >= 80).length}
-                      </h3>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                      <TrendingUp className="w-5 h-5 text-green-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lightbulb className="w-5 h-5 text-yellow-500" />
-                  AI Recommendations
-                </CardTitle>
-                <CardDescription>
-                  Actionable insights based on asset health and maintenance
-                  history
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {assets.filter((a) => a.healthScore < 70).length > 0 ? (
-                    assets
-                      .filter((a) => a.healthScore < 70)
-                      .map((asset) => {
-                        const recommendation = getAssetRecommendation(asset);
-                        return (
-                          <div
-                            key={asset.assetId}
-                            className="flex items-start gap-4 p-4 border rounded-lg"
-                          >
-                            <div
-                              className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                asset.healthScore < 50
-                                  ? "bg-red-100"
-                                  : "bg-yellow-100"
-                              }`}
-                            >
-                              <AlertTriangle
-                                className={`w-5 h-5 ${
-                                  asset.healthScore < 50
-                                    ? "text-red-600"
-                                    : "text-yellow-600"
-                                }`}
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <h4 className="font-semibold">
-                                    {asset.name}
-                                  </h4>
-                                  <p className="text-sm text-muted-foreground">
-                                    {asset.assetId} •{" "}
-                                    {asset.location.split(",")[0]}
-                                  </p>
-                                </div>
-                                <Badge
-                                  variant={
-                                    asset.healthScore < 50
-                                      ? "destructive"
-                                      : "secondary"
-                                  }
-                                >
-                                  {asset.healthScore}% Health
-                                </Badge>
-                              </div>
-                              <p className="text-sm mt-2">
-                                {recommendation.message}
-                              </p>
-                              <div className="flex gap-2 mt-3">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleOpenAiSummary(asset)}
-                                >
-                                  <Bot className="w-3 h-3 mr-1" />
-                                  View AI Analysis
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  onClick={() => {
-                                    setPmAssetId(asset.assetId);
-                                    setPmDialog(true);
-                                  }}
-                                >
-                                  <Plus className="w-3 h-3 mr-1" />
-                                  Schedule PM
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-green-500" />
-                      <p className="font-medium">
-                        All assets are in good condition!
-                      </p>
-                      <p className="text-sm">
-                        No immediate maintenance actions required.
-                      </p>
-                    </div>
-                  )}
-
-                  {requests.filter((r) => r.status === "pending").length >
-                    0 && (
-                    <div className="border-t pt-4 mt-4">
-                      <h4 className="font-semibold mb-3 flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        Pending Requests (
-                        {requests.filter((r) => r.status === "pending").length})
-                      </h4>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {requests.filter(
-                          (r) =>
-                            r.status === "pending" &&
-                            r.urgency === "immediately",
-                        ).length > 0 && (
-                          <span className="text-red-600 font-medium">
-                            {
-                              requests.filter(
-                                (r) =>
-                                  r.status === "pending" &&
-                                  r.urgency === "immediately",
-                              ).length
-                            }{" "}
-                            urgent request(s) need immediate attention.
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </TabsContent>
       </Tabs>
 
       {/* Approve Dialog */}
-      <Dialog
-        open={!!approveDialog}
-        onOpenChange={(open) => !open && setApproveDialog(null)}
-      >
+      <Dialog open={!!approveDialog} onOpenChange={() => setApproveDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Approve & Schedule Request</DialogTitle>
+            <DialogTitle>Approve Work Request</DialogTitle>
             <DialogDescription>
-              Assign a technician and schedule the maintenance for{" "}
-              <strong>{approveDialog?.assetName}</strong>.
+              Assign a technician and schedule date for {approveDialog?.tswrNo}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
+          <div className="space-y-4">
+            <div>
               <label className="text-sm font-medium">Technician</label>
               <Select
                 value={technicianToAssign}
                 onValueChange={setTechnicianToAssign}
               >
                 <SelectTrigger data-testid="select-technician">
-                  <SelectValue placeholder="Select technician..." />
+                  <SelectValue placeholder="Select technician" />
                 </SelectTrigger>
                 <SelectContent>
                   {technicians.map((tech) => (
@@ -1435,7 +1582,7 @@ export default function ManagerDashboard() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div>
               <label className="text-sm font-medium">Scheduled Date</label>
               <Input
                 type="date"
@@ -1444,13 +1591,13 @@ export default function ManagerDashboard() {
                 data-testid="input-scheduled-date"
               />
             </div>
-            <div className="space-y-2">
+            <div>
               <label className="text-sm font-medium">Urgency</label>
               <Select
                 value={urgency}
-                onValueChange={(v: UrgencyType) => setUrgency(v)}
+                onValueChange={(v) => setUrgency(v as UrgencyType)}
               >
-                <SelectTrigger>
+                <SelectTrigger data-testid="select-urgency">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1470,16 +1617,9 @@ export default function ManagerDashboard() {
             </Button>
             <Button
               onClick={handleApprove}
-              disabled={
-                !technicianToAssign ||
-                !scheduledDate ||
-                approveMutation.isPending
-              }
+              disabled={!technicianToAssign || !scheduledDate}
               data-testid="button-confirm-approve"
             >
-              {approveMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
               Approve & Schedule
             </Button>
           </DialogFooter>
@@ -1487,27 +1627,20 @@ export default function ManagerDashboard() {
       </Dialog>
 
       {/* Deny Dialog */}
-      <Dialog
-        open={!!denyDialog}
-        onOpenChange={(open) => !open && setDenyDialog(null)}
-      >
+      <Dialog open={!!denyDialog} onOpenChange={() => setDenyDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Deny Request</DialogTitle>
+            <DialogTitle>Deny Work Request</DialogTitle>
             <DialogDescription>
-              Please provide a reason for denying the request for{" "}
-              <strong>{denyDialog?.assetName}</strong>.
+              Provide a reason for denying {denyDialog?.tswrNo}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Textarea
-              placeholder="Reason for denial..."
-              value={denyReason}
-              onChange={(e) => setDenyReason(e.target.value)}
-              className="min-h-[100px]"
-              data-testid="textarea-deny-reason"
-            />
-          </div>
+          <Textarea
+            placeholder="Enter denial reason..."
+            value={denyReason}
+            onChange={(e) => setDenyReason(e.target.value)}
+            data-testid="input-deny-reason"
+          />
           <DialogFooter>
             <Button variant="outline" onClick={() => setDenyDialog(null)}>
               Cancel
@@ -1515,14 +1648,9 @@ export default function ManagerDashboard() {
             <Button
               variant="destructive"
               onClick={handleDeny}
-              disabled={!denyReason || denyMutation.isPending}
+              disabled={!denyReason}
               data-testid="button-confirm-deny"
             >
-              {denyMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <XCircle className="h-4 w-4 mr-2" />
-              )}
               Deny Request
             </Button>
           </DialogFooter>
@@ -1530,42 +1658,22 @@ export default function ManagerDashboard() {
       </Dialog>
 
       {/* Close Dialog */}
-      <Dialog
-        open={!!closeDialog}
-        onOpenChange={(open) => !open && setCloseDialog(null)}
-      >
+      <Dialog open={!!closeDialog} onOpenChange={() => setCloseDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Close Request</DialogTitle>
+            <DialogTitle>Close Work Request</DialogTitle>
             <DialogDescription>
-              The requester has confirmed completion. Do you want to close this
-              request?
+              Confirm closing {closeDialog?.tswrNo}
             </DialogDescription>
           </DialogHeader>
-          {closeDialog?.requesterFeedback && (
-            <div className="py-4">
-              <p className="text-sm font-medium mb-2">Requester Feedback:</p>
-              <div className="bg-muted p-3 rounded-md text-sm">
-                {closeDialog.requesterFeedback}
-              </div>
-            </div>
-          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setCloseDialog(null)}>
               Cancel
             </Button>
             <Button
-              onClick={() =>
-                closeDialog && closeMutation.mutate(closeDialog.id)
-              }
-              disabled={closeMutation.isPending}
+              onClick={() => closeDialog && closeMutation.mutate(closeDialog.id)}
               data-testid="button-confirm-close"
             >
-              {closeMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-              )}
               Close Request
             </Button>
           </DialogFooter>
@@ -1575,65 +1683,68 @@ export default function ManagerDashboard() {
       {/* User Dialog */}
       <Dialog
         open={!!userDialog}
-        onOpenChange={(open) => !open && setUserDialog(null)}
+        onOpenChange={() => {
+          setUserDialog(null);
+          resetUserForm();
+        }}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {userDialog?.mode === "create" ? "Create New User" : "Edit User"}
+              {userDialog?.mode === "create" ? "Create User" : "Edit User"}
             </DialogTitle>
           </DialogHeader>
           <form
             onSubmit={
-              userDialog?.mode === "create"
-                ? handleCreateUser
-                : handleUpdateUser
+              userDialog?.mode === "create" ? handleCreateUser : handleUpdateUser
             }
           >
-            <div className="space-y-4 py-4">
+            <div className="space-y-4">
               {userDialog?.mode === "create" && (
-                <div className="space-y-2">
+                <div>
                   <label className="text-sm font-medium">Email</label>
                   <Input
                     type="email"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="user@example.com"
                     required
-                    data-testid="input-email"
+                    data-testid="input-user-email"
                   />
                 </div>
               )}
-              <div className="space-y-2">
+              <div>
                 <label className="text-sm font-medium">Name</label>
                 <Input
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   required={userDialog?.mode === "create"}
-                  data-testid="input-name"
+                  data-testid="input-user-name"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Password{" "}
-                  {userDialog?.mode === "edit" &&
-                    "(leave blank to keep current)"}
-                </label>
+              <div>
+                <label className="text-sm font-medium">Password</label>
                 <Input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required={userDialog?.mode === "create"}
-                  data-testid="input-password"
+                  placeholder={
+                    userDialog?.mode === "edit"
+                      ? "Leave blank to keep current"
+                      : ""
+                  }
+                  data-testid="input-user-password"
                 />
               </div>
-              <div className="space-y-2">
+              <div>
                 <label className="text-sm font-medium">Role</label>
                 <Select
                   value={newRole}
-                  onValueChange={(v: any) => setNewRole(v)}
+                  onValueChange={(v) =>
+                    setNewRole(v as "employee" | "technician" | "manager")
+                  }
                 >
-                  <SelectTrigger data-testid="select-role">
+                  <SelectTrigger data-testid="select-user-role">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1644,153 +1755,126 @@ export default function ManagerDashboard() {
                 </Select>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="mt-4">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setUserDialog(null)}
+                onClick={() => {
+                  setUserDialog(null);
+                  resetUserForm();
+                }}
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={
-                  createUserMutation.isPending || updateUserMutation.isPending
-                }
-                data-testid="button-save-user"
-              >
-                {createUserMutation.isPending ||
-                updateUserMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : null}
-                {userDialog?.mode === "create" ? "Create User" : "Save Changes"}
+              <Button type="submit" data-testid="button-save-user">
+                {userDialog?.mode === "create" ? "Create" : "Save"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* PM Schedule Dialog */}
+      {/* PM Dialog */}
       <Dialog open={pmDialog} onOpenChange={setPmDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Create PM Schedule</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreatePm}>
-            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-              <div className="space-y-2">
+            <div className="space-y-4">
+              <div>
                 <label className="text-sm font-medium">Asset</label>
                 <Select value={pmAssetId} onValueChange={setPmAssetId}>
                   <SelectTrigger data-testid="select-pm-asset">
-                    <SelectValue placeholder="Select asset..." />
+                    <SelectValue placeholder="Select asset" />
                   </SelectTrigger>
                   <SelectContent>
                     {assets.map((asset) => (
                       <SelectItem key={asset.assetId} value={asset.assetId}>
-                        {asset.assetId} - {asset.name}
+                        {asset.name} ({asset.assetId})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+              <div>
                 <label className="text-sm font-medium">Description</label>
-                <Textarea
+                <Input
                   value={pmDescription}
                   onChange={(e) => setPmDescription(e.target.value)}
-                  placeholder="Describe the maintenance activity..."
                   required
+                  data-testid="input-pm-description"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Frequency</label>
-                  <Select value={pmFrequency} onValueChange={setPmFrequency}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="quarterly">Quarterly</SelectItem>
-                      <SelectItem value="semi_annual">Semi-Annual</SelectItem>
-                      <SelectItem value="annual">Annual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Next Due Date</label>
-                  <Input
-                    type="date"
-                    value={pmNextDueDate}
-                    onChange={(e) => setPmNextDueDate(e.target.value)}
-                    required
-                  />
-                </div>
+              <div>
+                <label className="text-sm font-medium">Frequency</label>
+                <Select value={pmFrequency} onValueChange={setPmFrequency}>
+                  <SelectTrigger data-testid="select-pm-frequency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                    <SelectItem value="semi_annual">Semi-Annual</SelectItem>
+                    <SelectItem value="annual">Annual</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Assign Technician
-                  </label>
-                  <Select
-                    value={pmTechnicianId}
-                    onValueChange={setPmTechnicianId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Optional..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {technicians.map((tech) => (
-                        <SelectItem key={tech.id} value={tech.id}>
-                          {tech.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Est. Duration (min)
-                  </label>
-                  <Input
-                    type="number"
-                    value={pmDuration}
-                    onChange={(e) => setPmDuration(e.target.value)}
-                    min="15"
-                  />
-                </div>
+              <div>
+                <label className="text-sm font-medium">Next Due Date</label>
+                <Input
+                  type="date"
+                  value={pmNextDueDate}
+                  onChange={(e) => setPmNextDueDate(e.target.value)}
+                  required
+                  data-testid="input-pm-due-date"
+                />
               </div>
-              <div className="space-y-2">
+              <div>
                 <label className="text-sm font-medium">
-                  Tasks (one per line)
+                  Assign Technician (Optional)
                 </label>
+                <Select value={pmTechnicianId} onValueChange={setPmTechnicianId}>
+                  <SelectTrigger data-testid="select-pm-technician">
+                    <SelectValue placeholder="Select technician" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {technicians.map((tech) => (
+                      <SelectItem key={tech.id} value={tech.id}>
+                        {tech.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Tasks (one per line)</label>
                 <Textarea
                   value={pmTasks}
                   onChange={(e) => setPmTasks(e.target.value)}
                   placeholder="Check oil levels&#10;Inspect belts&#10;Clean filters"
-                  className="min-h-[100px]"
+                  data-testid="input-pm-tasks"
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="mt-4">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setPmDialog(false)}
+                onClick={() => {
+                  setPmDialog(false);
+                  resetPmForm();
+                }}
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                disabled={
-                  !pmAssetId || !pmDescription || createPmMutation.isPending
-                }
+                disabled={!pmAssetId || !pmDescription || !pmNextDueDate}
+                data-testid="button-save-pm"
               >
-                {createPmMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : null}
                 Create Schedule
               </Button>
             </DialogFooter>
@@ -1801,48 +1885,38 @@ export default function ManagerDashboard() {
       {/* AI Summary Dialog */}
       <Dialog
         open={!!aiSummaryDialog}
-        onOpenChange={(open) => !open && setAiSummaryDialog(null)}
+        onOpenChange={() => setAiSummaryDialog(null)}
       >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bot className="w-5 h-5" />
-              AI Summary: {aiSummaryDialog?.name}
+              AI Analysis: {aiSummaryDialog?.name}
             </DialogTitle>
             <DialogDescription>
-              Analysis of service reports from the last 30 days
+              Service report analysis from the last 30 days
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <ScrollArea className="max-h-[60vh]">
             {aiLoading ? (
-              <div className="flex items-center justify-center py-8">
+              <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <span className="ml-2">Generating summary...</span>
               </div>
             ) : (
-              <div className="bg-muted p-4 rounded-lg">
-                {aiSummary ? (
-                  <MarkdownRenderer content={aiSummary} />
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No summary available.
-                  </p>
-                )}
+              <div className="p-4">
+                <MarkdownRenderer content={aiSummary} />
               </div>
             )}
-          </div>
+          </ScrollArea>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAiSummaryDialog(null)}>
-              Close
-            </Button>
             <Button
-              onClick={() =>
-                aiSummaryDialog && fetchAiSummary(aiSummaryDialog.assetId)
-              }
+              variant="outline"
+              onClick={() => aiSummaryDialog && fetchAiSummary(aiSummaryDialog.assetId)}
               disabled={aiLoading}
             >
-              Refresh Summary
+              Refresh Analysis
             </Button>
+            <Button onClick={() => setAiSummaryDialog(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1850,214 +1924,131 @@ export default function ManagerDashboard() {
       {/* Asset Detail Dialog */}
       <Dialog
         open={!!assetDetailDialog}
-        onOpenChange={(open) => !open && setAssetDetailDialog(null)}
+        onOpenChange={() => setAssetDetailDialog(null)}
       >
-        <DialogContent className="max-w-3xl max-h-[85vh]">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Settings className="w-5 h-5" />
-              {assetDetailDialog?.name}
-            </DialogTitle>
+            <DialogTitle>{assetDetailDialog?.name}</DialogTitle>
             <DialogDescription>
               {assetDetailDialog?.assetId} - {assetDetailDialog?.location}
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh] pr-4">
+          <ScrollArea className="max-h-[60vh]">
             {assetDetailLoading ? (
-              <div className="flex items-center justify-center py-8">
+              <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
               </div>
             ) : (
-              <div className="space-y-6">
-                <div>
-                  <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <ClipboardList className="w-4 h-4" />
-                    Pending/Ongoing Requests (
-                    {
-                      assetRequests.filter((r) =>
-                        ["pending", "scheduled", "ongoing"].includes(r.status),
-                      ).length
-                    }
-                    )
-                  </h4>
-                  {assetRequests.filter((r) =>
-                    ["pending", "scheduled", "ongoing"].includes(r.status),
-                  ).length > 0 ? (
-                    <div className="space-y-2">
-                      {assetRequests
-                        .filter((r) =>
-                          ["pending", "scheduled", "ongoing"].includes(
-                            r.status,
-                          ),
-                        )
-                        .map((req) => (
-                          <div
-                            key={req.id}
-                            className="border rounded-lg p-3 space-y-1"
-                          >
-                            <div className="flex justify-between items-start">
-                              <span className="font-mono text-xs">
-                                {req.tswrNo}
-                              </span>
-                              <Badge
-                                variant="outline"
-                                className={getStatusColor(req.status)}
-                              >
-                                {getStatusLabel(req.status)}
-                              </Badge>
-                            </div>
-                            <p className="text-sm">{req.workDescription}</p>
-                            <div className="flex gap-4 text-xs text-muted-foreground">
-                              <span>
-                                Urgency: {getUrgencyLabel(req.urgency)}
-                              </span>
-                              {req.assignedTo && (
-                                <span>Assigned: {req.assignedTo}</span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No pending or ongoing requests.
+              <Tabs defaultValue="reports">
+                <TabsList>
+                  <TabsTrigger value="reports">Service Reports</TabsTrigger>
+                  <TabsTrigger value="requests">Work Requests</TabsTrigger>
+                </TabsList>
+                <TabsContent value="reports" className="mt-4">
+                  {assetServiceReports.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">
+                      No service reports found
                     </p>
-                  )}
-                </div>
-
-                <div>
-                  <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <FileText className="w-4 h-4" />
-                    Service Reports ({assetServiceReports.length})
-                  </h4>
-                  {assetServiceReports.length > 0 ? (
-                    <div className="space-y-2">
+                  ) : (
+                    <div className="space-y-3">
                       {assetServiceReports.map((report) => (
                         <div
-                          key={report._id}
-                          className="border rounded-lg p-3 space-y-2"
+                          key={report.reportId}
+                          className="p-4 border rounded-lg"
                         >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <span className="font-mono text-xs">
-                                {report.reportId}
-                              </span>
-                              <span className="text-xs text-muted-foreground ml-2">
-                                {new Date(
-                                  report.serviceDate,
-                                ).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <Badge variant="outline" className="capitalize">
-                              {report.serviceType}
-                            </Badge>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-sm">
-                              <span className="font-medium">Problem:</span>{" "}
-                              {report.workDescription}
-                            </p>
-                            <p className="text-sm">
-                              <span className="font-medium">Work Done:</span>{" "}
-                              {report.reportFindings}
-                            </p>
-                          </div>
-                          <div className="flex gap-4 text-xs text-muted-foreground">
-                            <span>By: {report.preparedByName}</span>
-                            <span>Hours: {report.manHours.toFixed(1)}</span>
-                            <span>
-                              Cost: ₱
-                              {(
-                                report.laborCost + report.totalPartsCost
-                              ).toLocaleString()}
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="font-mono text-sm">
+                              {report.reportId}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(report.serviceDate).toLocaleDateString()}
                             </span>
                           </div>
+                          <p className="text-sm">{report.workDescription}</p>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            By: {report.preparedByName}
+                          </p>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No service reports found.
-                    </p>
                   )}
-                </div>
-              </div>
+                </TabsContent>
+                <TabsContent value="requests" className="mt-4">
+                  {assetRequests.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">
+                      No work requests found
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {assetRequests.map((req) => (
+                        <div key={req.id} className="p-4 border rounded-lg">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="font-mono text-sm">{req.tswrNo}</span>
+                            <Badge
+                              variant="outline"
+                              className={getStatusColor(req.status)}
+                            >
+                              {getStatusLabel(req.status)}
+                            </Badge>
+                          </div>
+                          <p className="text-sm">{req.workDescription}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             )}
           </ScrollArea>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setAssetDetailDialog(null)}
-            >
-              Close
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Request Detail Dialog */}
       <Dialog
         open={!!requestDetailDialog}
-        onOpenChange={(open) => !open && setRequestDetailDialog(null)}
+        onOpenChange={() => setRequestDetailDialog(null)}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ClipboardList className="w-5 h-5" />
-              Request Details
-            </DialogTitle>
+            <DialogTitle>Request Details</DialogTitle>
             <DialogDescription>{requestDetailDialog?.tswrNo}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">Asset:</span>
-                <p className="font-medium">{requestDetailDialog?.assetName}</p>
+          {requestDetailDialog && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-muted-foreground">Asset</label>
+                  <p className="font-medium">{requestDetailDialog.assetName}</p>
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">
+                    Location
+                  </label>
+                  <p className="font-medium">{requestDetailDialog.location}</p>
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">
+                    Submitted By
+                  </label>
+                  <p className="font-medium">{requestDetailDialog.submittedBy}</p>
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">
+                    Urgency
+                  </label>
+                  <Badge variant="secondary" className="capitalize">
+                    {getUrgencyLabel(requestDetailDialog.urgency)}
+                  </Badge>
+                </div>
               </div>
               <div>
-                <span className="text-muted-foreground">Location:</span>
-                <p className="font-medium">{requestDetailDialog?.location}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Urgency:</span>
-                <Badge variant="secondary" className="mt-1">
-                  {requestDetailDialog &&
-                    getUrgencyLabel(requestDetailDialog.urgency)}
-                </Badge>
-              </div>
-              <div>
-                <span className="text-muted-foreground">
-                  Disrupts Operation:
-                </span>
-                <p className="font-medium">
-                  {requestDetailDialog?.disruptsOperation ? "Yes" : "No"}
-                </p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Submitted By:</span>
-                <p className="font-medium">
-                  {requestDetailDialog?.submittedBy}
-                </p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Submitted At:</span>
-                <p className="font-medium">
-                  {requestDetailDialog?.submittedAt &&
-                    new Date(requestDetailDialog.submittedAt).toLocaleString()}
-                </p>
+                <label className="text-sm text-muted-foreground">
+                  Description
+                </label>
+                <p className="font-medium">{requestDetailDialog.workDescription}</p>
               </div>
             </div>
-            <div>
-              <span className="text-sm text-muted-foreground">
-                Work Description:
-              </span>
-              <div className="bg-muted p-3 rounded-lg mt-1">
-                <p className="text-sm">
-                  {requestDetailDialog?.workDescription}
-                </p>
-              </div>
-            </div>
-          </div>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
@@ -2065,16 +2056,105 @@ export default function ManagerDashboard() {
             >
               Close
             </Button>
+            {requestDetailDialog?.status === "pending" && (
+              <>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setDenyDialog(requestDetailDialog);
+                    setRequestDetailDialog(null);
+                  }}
+                >
+                  Deny
+                </Button>
+                <Button
+                  onClick={() => {
+                    setApproveDialog(requestDetailDialog);
+                    setUrgency(requestDetailDialog.urgency);
+                    setRequestDetailDialog(null);
+                  }}
+                >
+                  Approve
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Work Order Dialog */}
+      <Dialog open={workOrderDialog} onOpenChange={setWorkOrderDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Work Order</DialogTitle>
+            <DialogDescription>
+              Create a new work order for an asset
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Asset</label>
+              <Select value={woAssetId} onValueChange={setWoAssetId}>
+                <SelectTrigger data-testid="select-wo-asset">
+                  <SelectValue placeholder="Select asset" />
+                </SelectTrigger>
+                <SelectContent>
+                  {assets.map((asset) => (
+                    <SelectItem key={asset.assetId} value={asset.assetId}>
+                      {asset.name} ({asset.assetId})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Work Description</label>
+              <Textarea
+                value={woDescription}
+                onChange={(e) => setWoDescription(e.target.value)}
+                placeholder="Describe the work to be done..."
+                data-testid="input-wo-description"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Urgency</label>
+              <Select
+                value={woUrgency}
+                onValueChange={(v) => setWoUrgency(v as UrgencyType)}
+              >
+                <SelectTrigger data-testid="select-wo-urgency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="standstill">Stand Still</SelectItem>
+                  <SelectItem value="immediately">Immediately</SelectItem>
+                  <SelectItem value="on_occasion">On Occasion</SelectItem>
+                  <SelectItem value="during_maintenance">
+                    During Maintenance
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWorkOrderDialog(false)}>
+              Cancel
+            </Button>
             <Button
+              disabled={!woAssetId || !woDescription}
               onClick={() => {
-                if (requestDetailDialog) {
-                  setRequestDetailDialog(null);
-                  setApproveDialog(requestDetailDialog);
-                  setUrgency(requestDetailDialog.urgency);
-                }
+                toast({
+                  title: "Work Order Created",
+                  description: "Navigate to Work Requests to approve and assign.",
+                });
+                setWorkOrderDialog(false);
+                setWoAssetId("");
+                setWoDescription("");
+                setWoUrgency("standstill");
               }}
+              data-testid="button-create-wo"
             >
-              Approve & Assign
+              Create Work Order
             </Button>
           </DialogFooter>
         </DialogContent>
