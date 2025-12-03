@@ -1,23 +1,46 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { WorkRequest, User, Asset, PreventiveMaintenance, DashboardStats, ServiceReport, getStatusColor, getStatusLabel, getUrgencyLabel, UrgencyType } from "@/lib/mock-data";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  WorkRequest,
+  User,
+  Asset,
+  PreventiveMaintenance,
+  DashboardStats,
+  ServiceReport,
+  getStatusColor,
+  getStatusLabel,
+  getUrgencyLabel,
+  UrgencyType,
+} from "@/lib/mock-data";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -26,10 +49,29 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  BarChart3, Clock, CheckCircle2, Users, Loader2, XCircle, Calendar, 
-  Plus, Archive, Edit, Wrench, Settings, ClipboardList, UserPlus, Bot,
-  AlertTriangle, TrendingUp, TrendingDown, Activity, Lightbulb, FileText, Eye
+import {
+  BarChart3,
+  Clock,
+  CheckCircle2,
+  Users,
+  Loader2,
+  XCircle,
+  Calendar,
+  Plus,
+  Archive,
+  Edit,
+  Wrench,
+  Settings,
+  ClipboardList,
+  UserPlus,
+  Bot,
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  Lightbulb,
+  FileText,
+  Eye,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMemo } from "react";
@@ -39,18 +81,22 @@ function MarkdownRenderer({ content }: { content: string }) {
     const result: React.ReactNode[] = [];
     let remaining = text;
     let keyCounter = 0;
-    
+
     while (remaining.length > 0) {
       const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
-      
+
       if (boldMatch && boldMatch.index !== undefined) {
         if (boldMatch.index > 0) {
-          result.push(<span key={keyCounter++}>{remaining.slice(0, boldMatch.index)}</span>);
+          result.push(
+            <span key={keyCounter++}>
+              {remaining.slice(0, boldMatch.index)}
+            </span>,
+          );
         }
         result.push(
           <strong key={keyCounter++} className="font-bold text-foreground">
             {boldMatch[1]}
-          </strong>
+          </strong>,
         );
         remaining = remaining.slice(boldMatch.index + boldMatch[0].length);
       } else {
@@ -60,80 +106,95 @@ function MarkdownRenderer({ content }: { content: string }) {
         break;
       }
     }
-    
+
     return result;
   };
 
   const rendered = useMemo(() => {
     if (!content) return null;
-    
-    const lines = content.split('\n');
+
+    const lines = content.split("\n");
     const elements: React.ReactNode[] = [];
     let currentListItems: React.ReactNode[] = [];
     let elementKey = 0;
-    
+
     const flushList = () => {
       if (currentListItems.length > 0) {
         elements.push(
-          <ul key={`list-${elementKey++}`} className="list-disc ml-5 space-y-1 my-2">
+          <ul
+            key={`list-${elementKey++}`}
+            className="list-disc ml-5 space-y-1 my-2"
+          >
             {currentListItems}
-          </ul>
+          </ul>,
         );
         currentListItems = [];
       }
     };
-    
+
     lines.forEach((line, lineIndex) => {
       const trimmed = line.trim();
-      
+
       if (!trimmed) {
         flushList();
         return;
       }
-      
-      if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+
+      if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
         const itemContent = trimmed.slice(2);
         currentListItems.push(
-          <li key={`item-${lineIndex}`} className="text-sm text-muted-foreground">
+          <li
+            key={`item-${lineIndex}`}
+            className="text-sm text-muted-foreground"
+          >
             {parseInlineStyles(itemContent)}
-          </li>
+          </li>,
         );
         return;
       }
-      
+
       flushList();
-      
+
       if (/^\*\*[^*]+\*\*$/.test(trimmed)) {
         const headerText = trimmed.slice(2, -2);
         elements.push(
-          <h3 key={`h-${elementKey++}`} className="font-bold text-base text-foreground mt-4 mb-2 first:mt-0">
+          <h3
+            key={`h-${elementKey++}`}
+            className="font-bold text-base text-foreground mt-4 mb-2 first:mt-0"
+          >
             {headerText}
-          </h3>
+          </h3>,
         );
         return;
       }
-      
+
       if (/^\d+\.\s/.test(trimmed)) {
-        const itemContent = trimmed.replace(/^\d+\.\s/, '');
+        const itemContent = trimmed.replace(/^\d+\.\s/, "");
         elements.push(
-          <div key={`num-${elementKey++}`} className="text-sm text-muted-foreground my-1 ml-2">
+          <div
+            key={`num-${elementKey++}`}
+            className="text-sm text-muted-foreground my-1 ml-2"
+          >
             {parseInlineStyles(itemContent)}
-          </div>
+          </div>,
         );
         return;
       }
-      
+
       elements.push(
-        <p key={`p-${elementKey++}`} className="text-sm text-muted-foreground my-1">
+        <p
+          key={`p-${elementKey++}`}
+          className="text-sm text-muted-foreground my-1"
+        >
           {parseInlineStyles(trimmed)}
-        </p>
+        </p>,
       );
     });
-    
+
     flushList();
     return elements;
   }, [content]);
-  
+
   return <div className="space-y-1">{rendered}</div>;
 }
 
@@ -163,7 +224,7 @@ export default function ManagerDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("requests");
-  
+
   const [approveDialog, setApproveDialog] = useState<WorkRequest | null>(null);
   const [denyDialog, setDenyDialog] = useState<WorkRequest | null>(null);
   const [closeDialog, setCloseDialog] = useState<WorkRequest | null>(null);
@@ -172,11 +233,16 @@ export default function ManagerDashboard() {
   const [urgency, setUrgency] = useState<UrgencyType>("standstill");
   const [denyReason, setDenyReason] = useState("");
 
-  const [userDialog, setUserDialog] = useState<{ mode: 'create' | 'edit'; user?: User } | null>(null);
+  const [userDialog, setUserDialog] = useState<{
+    mode: "create" | "edit";
+    user?: User;
+  } | null>(null);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newName, setNewName] = useState("");
-  const [newRole, setNewRole] = useState<"employee" | "technician" | "manager">("employee");
+  const [newRole, setNewRole] = useState<"employee" | "technician" | "manager">(
+    "employee",
+  );
 
   const [pmDialog, setPmDialog] = useState(false);
   const [pmAssetId, setPmAssetId] = useState("");
@@ -190,19 +256,28 @@ export default function ManagerDashboard() {
   const [aiSummaryDialog, setAiSummaryDialog] = useState<Asset | null>(null);
   const [aiSummary, setAiSummary] = useState<string>("");
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiSummaryCache, setAiSummaryCache] = useState<Record<string, string>>({});
-  
-  const [assetDetailDialog, setAssetDetailDialog] = useState<Asset | null>(null);
-  const [assetServiceReports, setAssetServiceReports] = useState<ServiceReport[]>([]);
+  const [aiSummaryCache, setAiSummaryCache] = useState<Record<string, string>>(
+    {},
+  );
+
+  const [assetDetailDialog, setAssetDetailDialog] = useState<Asset | null>(
+    null,
+  );
+  const [assetServiceReports, setAssetServiceReports] = useState<
+    ServiceReport[]
+  >([]);
   const [assetRequests, setAssetRequests] = useState<WorkRequest[]>([]);
   const [assetDetailLoading, setAssetDetailLoading] = useState(false);
-  
-  const [requestDetailDialog, setRequestDetailDialog] = useState<WorkRequest | null>(null);
+
+  const [requestDetailDialog, setRequestDetailDialog] =
+    useState<WorkRequest | null>(null);
 
   const { data: requests = [], isLoading } = useQuery<WorkRequest[]>({
     queryKey: ["requests-all"],
     queryFn: async () => {
-      const response = await fetch("/api/requests/all", { credentials: "include" });
+      const response = await fetch("/api/requests/all", {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to fetch requests");
       return response.json();
     },
@@ -211,7 +286,9 @@ export default function ManagerDashboard() {
   const { data: technicians = [] } = useQuery<Technician[]>({
     queryKey: ["technicians"],
     queryFn: async () => {
-      const response = await fetch("/api/users/technicians", { credentials: "include" });
+      const response = await fetch("/api/users/technicians", {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to fetch technicians");
       return response.json();
     },
@@ -238,7 +315,9 @@ export default function ManagerDashboard() {
   const { data: pmSchedules = [] } = useQuery<PreventiveMaintenance[]>({
     queryKey: ["pm-schedules"],
     queryFn: async () => {
-      const response = await fetch("/api/pm-schedules", { credentials: "include" });
+      const response = await fetch("/api/pm-schedules", {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to fetch PM schedules");
       return response.json();
     },
@@ -254,7 +333,17 @@ export default function ManagerDashboard() {
   });
 
   const approveMutation = useMutation({
-    mutationFn: async ({ id, technicianId, scheduledDate, urgency }: { id: string; technicianId: string; scheduledDate: string; urgency: string }) => {
+    mutationFn: async ({
+      id,
+      technicianId,
+      scheduledDate,
+      urgency,
+    }: {
+      id: string;
+      technicianId: string;
+      scheduledDate: string;
+      urgency: string;
+    }) => {
       const response = await fetch(`/api/requests/${id}/approve`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -269,10 +358,17 @@ export default function ManagerDashboard() {
       queryClient.invalidateQueries({ queryKey: ["stats"] });
       setApproveDialog(null);
       resetApproveForm();
-      toast({ title: "Request Approved", description: "The request has been scheduled successfully." });
+      toast({
+        title: "Request Approved",
+        description: "The request has been scheduled successfully.",
+      });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to approve request.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Failed to approve request.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -292,10 +388,17 @@ export default function ManagerDashboard() {
       queryClient.invalidateQueries({ queryKey: ["stats"] });
       setDenyDialog(null);
       setDenyReason("");
-      toast({ title: "Request Denied", description: "The request has been denied." });
+      toast({
+        title: "Request Denied",
+        description: "The request has been denied.",
+      });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to deny request.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Failed to deny request.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -312,15 +415,27 @@ export default function ManagerDashboard() {
       queryClient.invalidateQueries({ queryKey: ["requests-all"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
       setCloseDialog(null);
-      toast({ title: "Request Closed", description: "The request has been marked as closed." });
+      toast({
+        title: "Request Closed",
+        description: "The request has been marked as closed.",
+      });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to close request.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Failed to close request.",
+        variant: "destructive",
+      });
     },
   });
 
   const createUserMutation = useMutation({
-    mutationFn: async (data: { email: string; password: string; name: string; role: string }) => {
+    mutationFn: async (data: {
+      email: string;
+      password: string;
+      name: string;
+      role: string;
+    }) => {
       const response = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -338,15 +453,28 @@ export default function ManagerDashboard() {
       queryClient.invalidateQueries({ queryKey: ["technicians"] });
       setUserDialog(null);
       resetUserForm();
-      toast({ title: "User Created", description: "New user has been created successfully." });
+      toast({
+        title: "User Created",
+        description: "New user has been created successfully.",
+      });
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
   const updateUserMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { name?: string; role?: string; password?: string } }) => {
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: { name?: string; role?: string; password?: string };
+    }) => {
       const response = await fetch(`/api/users/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -361,10 +489,17 @@ export default function ManagerDashboard() {
       queryClient.invalidateQueries({ queryKey: ["technicians"] });
       setUserDialog(null);
       resetUserForm();
-      toast({ title: "User Updated", description: "User has been updated successfully." });
+      toast({
+        title: "User Updated",
+        description: "User has been updated successfully.",
+      });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to update user.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Failed to update user.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -383,10 +518,17 @@ export default function ManagerDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       queryClient.invalidateQueries({ queryKey: ["technicians"] });
-      toast({ title: "User Archived", description: "User has been archived successfully." });
+      toast({
+        title: "User Archived",
+        description: "User has been archived successfully.",
+      });
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -405,20 +547,27 @@ export default function ManagerDashboard() {
       queryClient.invalidateQueries({ queryKey: ["pm-schedules"] });
       setPmDialog(false);
       resetPmForm();
-      toast({ title: "PM Schedule Created", description: "Preventive maintenance schedule created successfully." });
+      toast({
+        title: "PM Schedule Created",
+        description: "Preventive maintenance schedule created successfully.",
+      });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to create PM schedule.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Failed to create PM schedule.",
+        variant: "destructive",
+      });
     },
   });
 
   const handleApprove = () => {
     if (!approveDialog || !technicianToAssign || !scheduledDate) return;
-    approveMutation.mutate({ 
-      id: approveDialog.id, 
-      technicianId: technicianToAssign, 
+    approveMutation.mutate({
+      id: approveDialog.id,
+      technicianId: technicianToAssign,
       scheduledDate,
-      urgency
+      urgency,
     });
   };
 
@@ -458,7 +607,7 @@ export default function ManagerDashboard() {
       frequency: pmFrequency,
       nextDueDate: pmNextDueDate,
       technicianId: pmTechnicianId || undefined,
-      tasks: pmTasks.split('\n').filter(t => t.trim()),
+      tasks: pmTasks.split("\n").filter((t) => t.trim()),
       estimatedDuration: parseInt(pmDuration) || 60,
     });
   };
@@ -487,7 +636,7 @@ export default function ManagerDashboard() {
   };
 
   const openEditUser = (user: User) => {
-    setUserDialog({ mode: 'edit', user });
+    setUserDialog({ mode: "edit", user });
     setNewName(user.name);
     setNewRole(user.role);
     setNewPassword("");
@@ -496,16 +645,20 @@ export default function ManagerDashboard() {
   const fetchAiSummary = async (assetId: string) => {
     setAiLoading(true);
     try {
-      const response = await fetch(`/api/ai/summary/${assetId}`, { credentials: "include" });
+      const response = await fetch(`/api/ai/summary/${assetId}`, {
+        credentials: "include",
+      });
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || "Failed to get AI summary");
       }
       const data = await response.json();
       setAiSummary(data.summary);
-      setAiSummaryCache(prev => ({ ...prev, [assetId]: data.summary }));
+      setAiSummaryCache((prev) => ({ ...prev, [assetId]: data.summary }));
     } catch (error: any) {
-      setAiSummary("Unable to generate summary. Please try again or check that the Gemini API key is configured correctly.");
+      setAiSummary(
+        "Unable to generate summary. Please try again or check that the Gemini API key is configured correctly.",
+      );
     } finally {
       setAiLoading(false);
     }
@@ -525,10 +678,12 @@ export default function ManagerDashboard() {
     setAssetDetailLoading(true);
     try {
       const [reportsRes, requestsRes] = await Promise.all([
-        fetch(`/api/assets/${assetId}/service-reports`, { credentials: "include" }),
-        fetch(`/api/assets/${assetId}/requests`, { credentials: "include" })
+        fetch(`/api/assets/${assetId}/service-reports`, {
+          credentials: "include",
+        }),
+        fetch(`/api/assets/${assetId}/requests`, { credentials: "include" }),
       ]);
-      
+
       if (reportsRes.ok) {
         const reports = await reportsRes.json();
         setAssetServiceReports(reports);
@@ -557,22 +712,58 @@ export default function ManagerDashboard() {
 
   const getAssetRecommendation = (asset: Asset) => {
     if (asset.healthScore < 50) {
-      return { type: "critical", message: "Schedule immediate inspection and maintenance", color: "text-red-600 bg-red-50" };
+      return {
+        type: "critical",
+        message: "Schedule immediate inspection and maintenance",
+        color: "text-red-600 bg-red-50",
+      };
     }
     if (asset.healthScore < 70) {
-      return { type: "warning", message: "Consider preventive maintenance soon", color: "text-yellow-600 bg-yellow-50" };
+      return {
+        type: "warning",
+        message: "Consider preventive maintenance soon",
+        color: "text-yellow-600 bg-yellow-50",
+      };
     }
     if (asset.healthScore >= 90) {
-      return { type: "good", message: "Asset in excellent condition", color: "text-green-600 bg-green-50" };
+      return {
+        type: "good",
+        message: "Asset in excellent condition",
+        color: "text-green-600 bg-green-50",
+      };
     }
-    return { type: "ok", message: "Monitor during next scheduled check", color: "text-blue-600 bg-blue-50" };
+    return {
+      type: "ok",
+      message: "Monitor during next scheduled check",
+      color: "text-blue-600 bg-blue-50",
+    };
   };
 
   const statCards = [
-    { label: "Total Requests", value: stats?.requests.total || 0, icon: BarChart3, color: "text-blue-600 bg-blue-100" },
-    { label: "Pending", value: stats?.requests.pending || 0, icon: Clock, color: "text-yellow-600 bg-yellow-100" },
-    { label: "Closed", value: stats?.requests.closed || 0, icon: CheckCircle2, color: "text-green-600 bg-green-100" },
-    { label: "Technicians", value: stats?.technicians || 0, icon: Users, color: "text-purple-600 bg-purple-100" },
+    {
+      label: "Total Requests",
+      value: stats?.requests.total || 0,
+      icon: BarChart3,
+      color: "text-blue-600 bg-blue-100",
+    },
+    {
+      label: "Pending",
+      value: stats?.requests.pending || 0,
+      icon: Clock,
+      color: "text-yellow-600 bg-yellow-100",
+    },
+    {
+      label: "Closed",
+      value: stats?.requests.closed || 0,
+      icon: CheckCircle2,
+      color: "text-green-600 bg-green-100",
+    },
+    {
+      label: "Technicians",
+      value: stats?.technicians || 0,
+      icon: Users,
+      color: "text-purple-600 bg-purple-100",
+    },
   ];
 
   if (isLoading) {
@@ -586,8 +777,12 @@ export default function ManagerDashboard() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-foreground">Manager Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Manage requests, users, and preventive maintenance schedules.</p>
+        <h1 className="text-3xl font-heading font-bold text-foreground">
+          Manager Dashboard
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Manage requests, users, and preventive maintenance schedules.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -595,10 +790,19 @@ export default function ManagerDashboard() {
           <Card key={i}>
             <CardContent className="p-6 flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                <h3 className="text-3xl font-bold mt-1" data-testid={`stat-${stat.label.toLowerCase().replace(' ', '-')}`}>{stat.value}</h3>
+                <p className="text-sm font-medium text-muted-foreground">
+                  {stat.label}
+                </p>
+                <h3
+                  className="text-3xl font-bold mt-1"
+                  data-testid={`stat-${stat.label.toLowerCase().replace(" ", "-")}`}
+                >
+                  {stat.value}
+                </h3>
               </div>
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${stat.color}`}>
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center ${stat.color}`}
+              >
                 <stat.icon className="w-6 h-6" />
               </div>
             </CardContent>
@@ -650,12 +854,19 @@ export default function ManagerDashboard() {
                 </TableHeader>
                 <TableBody>
                   {requests.map((req) => (
-                    <TableRow key={req.id} data-testid={`row-request-${req.id}`}>
-                      <TableCell className="font-mono text-xs">{req.tswrNo}</TableCell>
+                    <TableRow
+                      key={req.id}
+                      data-testid={`row-request-${req.id}`}
+                    >
+                      <TableCell className="font-mono text-xs">
+                        {req.tswrNo}
+                      </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="font-medium">{req.assetName}</span>
-                          <span className="text-xs text-muted-foreground">{req.location}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {req.location}
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -664,33 +875,42 @@ export default function ManagerDashboard() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={getStatusColor(req.status)}>
+                        <Badge
+                          variant="outline"
+                          className={getStatusColor(req.status)}
+                        >
                           {getStatusLabel(req.status)}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {req.assignedTo || <span className="text-muted-foreground italic">Unassigned</span>}
+                        {req.assignedTo || (
+                          <span className="text-muted-foreground italic">
+                            Unassigned
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {req.requesterFeedback ? (
-                          <span className="text-sm text-green-600">{req.requesterFeedback.substring(0, 30)}...</span>
+                          <span className="text-sm text-green-600">
+                            {req.requesterFeedback.substring(0, 30)}...
+                          </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right space-x-2">
-                        {req.status === 'pending' && (
+                        {req.status === "pending" && (
                           <>
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               onClick={() => handleOpenRequestDetail(req)}
                               data-testid={`button-view-${req.id}`}
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => {
                                 setApproveDialog(req);
@@ -700,8 +920,8 @@ export default function ManagerDashboard() {
                             >
                               Approve
                             </Button>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               className="text-red-600"
                               onClick={() => setDenyDialog(req)}
@@ -711,17 +931,18 @@ export default function ManagerDashboard() {
                             </Button>
                           </>
                         )}
-                        {(req.status === 'resolved' && req.requesterConfirmedAt) && (
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setCloseDialog(req)}
-                            data-testid={`button-close-${req.id}`}
-                          >
-                            Close
-                          </Button>
-                        )}
-                        {req.status === 'closed' && req.turnaroundTime && (
+                        {req.status === "resolved" &&
+                          req.requesterConfirmedAt && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCloseDialog(req)}
+                              data-testid={`button-close-${req.id}`}
+                            >
+                              Close
+                            </Button>
+                          )}
+                        {req.status === "closed" && req.turnaroundTime && (
                           <span className="text-xs text-muted-foreground">
                             {req.turnaroundTime}h turnaround
                           </span>
@@ -739,7 +960,11 @@ export default function ManagerDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Preventive Maintenance Schedules</CardTitle>
-              <Button onClick={() => setPmDialog(true)} className="gap-2" data-testid="button-add-pm">
+              <Button
+                onClick={() => setPmDialog(true)}
+                className="gap-2"
+                data-testid="button-add-pm"
+              >
                 <Plus className="w-4 h-4" />
                 Add PM Schedule
               </Button>
@@ -759,12 +984,18 @@ export default function ManagerDashboard() {
                 <TableBody>
                   {pmSchedules.map((pm) => (
                     <TableRow key={pm.scheduleId}>
-                      <TableCell className="font-mono text-xs">{pm.scheduleId}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {pm.scheduleId}
+                      </TableCell>
                       <TableCell>{pm.assetName}</TableCell>
                       <TableCell>{pm.description}</TableCell>
-                      <TableCell className="capitalize">{pm.frequency.replace('_', ' ')}</TableCell>
-                      <TableCell>{new Date(pm.nextDueDate).toLocaleDateString()}</TableCell>
-                      <TableCell>{pm.assignedToName || '-'}</TableCell>
+                      <TableCell className="capitalize">
+                        {pm.frequency.replace("_", " ")}
+                      </TableCell>
+                      <TableCell>
+                        {new Date(pm.nextDueDate).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>{pm.assignedToName || "-"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -777,7 +1008,11 @@ export default function ManagerDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>User Management</CardTitle>
-              <Button onClick={() => setUserDialog({ mode: 'create' })} className="gap-2" data-testid="button-add-user">
+              <Button
+                onClick={() => setUserDialog({ mode: "create" })}
+                className="gap-2"
+                data-testid="button-add-user"
+              >
                 <UserPlus className="w-4 h-4" />
                 Add User
               </Button>
@@ -796,29 +1031,44 @@ export default function ManagerDashboard() {
                 </TableHeader>
                 <TableBody>
                   {users.map((user) => (
-                    <TableRow key={user._id} data-testid={`row-user-${user._id}`}>
-                      <TableCell className="font-mono">{user.username}</TableCell>
+                    <TableRow
+                      key={user._id}
+                      data-testid={`row-user-${user._id}`}
+                    >
+                      <TableCell className="font-mono">
+                        {user.username}
+                      </TableCell>
                       <TableCell>{user.name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={`capitalize ${getRoleColor(user.role)}`}>{user.role}</Badge>
+                        <Badge
+                          variant="outline"
+                          className={`capitalize ${getRoleColor(user.role)}`}
+                        >
+                          {user.role}
+                        </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={getUserStatusColor(!user.isArchived)}>
+                        <Badge
+                          variant="outline"
+                          className={getUserStatusColor(!user.isArchived)}
+                        >
                           {user.isArchived ? "Archived" : "Active"}
                         </Badge>
                       </TableCell>
-                      <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        {new Date(user.createdAt).toLocaleDateString()}
+                      </TableCell>
                       <TableCell className="text-right space-x-2">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => openEditUser(user)}
                           data-testid={`button-edit-user-${user._id}`}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
                           onClick={() => archiveUserMutation.mutate(user._id)}
@@ -845,54 +1095,78 @@ export default function ManagerDashboard() {
                     <CardHeader className="pb-2">
                       <div className="flex justify-between items-start">
                         <div>
-                          <CardTitle className="text-base">{asset.name}</CardTitle>
-                          <p className="text-xs text-muted-foreground font-mono">{asset.assetId}</p>
+                          <CardTitle className="text-base">
+                            {asset.name}
+                          </CardTitle>
+                          <p className="text-xs text-muted-foreground font-mono">
+                            {asset.assetId}
+                          </p>
                         </div>
-                        <Badge variant="outline" className="capitalize">{asset.status.replace('_', ' ')}</Badge>
+                        <Badge variant="outline" className="capitalize">
+                          {asset.status.replace("_", " ")}
+                        </Badge>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>Health Score</span>
-                          <span className="font-semibold">{asset.healthScore}%</span>
+                          <span className="font-semibold">
+                            {asset.healthScore}%
+                          </span>
                         </div>
-                        <Progress 
-                          value={asset.healthScore} 
+                        <Progress
+                          value={asset.healthScore}
                           className={`h-2 ${
-                            asset.healthScore >= 80 ? '[&>div]:bg-green-500' : 
-                            asset.healthScore >= 50 ? '[&>div]:bg-yellow-500' : 
-                            '[&>div]:bg-red-500'
+                            asset.healthScore >= 80
+                              ? "[&>div]:bg-green-500"
+                              : asset.healthScore >= 50
+                                ? "[&>div]:bg-yellow-500"
+                                : "[&>div]:bg-red-500"
                           }`}
                         />
                       </div>
-                      
+
                       <div className="text-sm space-y-1">
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Location</span>
-                          <span className="text-right text-xs">{asset.location.split(',')[0]}</span>
+                          <span className="text-muted-foreground">
+                            Location
+                          </span>
+                          <span className="text-right text-xs">
+                            {asset.location.split(",")[0]}
+                          </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Current Value</span>
+                          <span className="text-muted-foreground">
+                            Current Value
+                          </span>
                           <span>₱{asset.currentValue.toLocaleString()}</span>
                         </div>
                         {asset.lastMaintenanceDate && (
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Last Maintenance</span>
-                            <span>{new Date(asset.lastMaintenanceDate).toLocaleDateString()}</span>
+                            <span className="text-muted-foreground">
+                              Last Maintenance
+                            </span>
+                            <span>
+                              {new Date(
+                                asset.lastMaintenanceDate,
+                              ).toLocaleDateString()}
+                            </span>
                           </div>
                         )}
                       </div>
 
-                      <div className={`text-xs p-2 rounded flex items-center gap-2 ${recommendation.color}`}>
+                      <div
+                        className={`text-xs p-2 rounded flex items-center gap-2 ${recommendation.color}`}
+                      >
                         <Lightbulb className="w-3 h-3" />
                         {recommendation.message}
                       </div>
 
                       <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="flex-1 gap-2"
                           onClick={() => handleOpenAssetDetail(asset)}
                           data-testid={`button-view-asset-${asset.assetId}`}
@@ -900,9 +1174,9 @@ export default function ManagerDashboard() {
                           <Eye className="w-4 h-4" />
                           View Details
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="flex-1 gap-2"
                           onClick={() => handleOpenAiSummary(asset)}
                           data-testid={`button-ai-summary-${asset.assetId}`}
@@ -926,8 +1200,12 @@ export default function ManagerDashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Avg Turnaround</p>
-                      <h3 className="text-2xl font-bold">{stats?.avgTurnaroundHours || 0}h</h3>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Avg Turnaround
+                      </p>
+                      <h3 className="text-2xl font-bold">
+                        {stats?.avgTurnaroundHours || 0}h
+                      </h3>
                     </div>
                     <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                       <Clock className="w-5 h-5 text-blue-600" />
@@ -939,9 +1217,11 @@ export default function ManagerDashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Assets Critical</p>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Assets Critical
+                      </p>
                       <h3 className="text-2xl font-bold text-red-600">
-                        {assets.filter(a => a.healthScore < 50).length}
+                        {assets.filter((a) => a.healthScore < 50).length}
                       </h3>
                     </div>
                     <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
@@ -954,9 +1234,15 @@ export default function ManagerDashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Needs Attention</p>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Needs Attention
+                      </p>
                       <h3 className="text-2xl font-bold text-yellow-600">
-                        {assets.filter(a => a.healthScore >= 50 && a.healthScore < 70).length}
+                        {
+                          assets.filter(
+                            (a) => a.healthScore >= 50 && a.healthScore < 70,
+                          ).length
+                        }
                       </h3>
                     </div>
                     <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
@@ -969,9 +1255,11 @@ export default function ManagerDashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Healthy Assets</p>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Healthy Assets
+                      </p>
                       <h3 className="text-2xl font-bold text-green-600">
-                        {assets.filter(a => a.healthScore >= 80).length}
+                        {assets.filter((a) => a.healthScore >= 80).length}
                       </h3>
                     </div>
                     <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
@@ -988,75 +1276,121 @@ export default function ManagerDashboard() {
                   <Lightbulb className="w-5 h-5 text-yellow-500" />
                   AI Recommendations
                 </CardTitle>
-                <CardDescription>Actionable insights based on asset health and maintenance history</CardDescription>
+                <CardDescription>
+                  Actionable insights based on asset health and maintenance
+                  history
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {assets.filter(a => a.healthScore < 70).length > 0 ? (
-                    assets.filter(a => a.healthScore < 70).map((asset) => {
-                      const recommendation = getAssetRecommendation(asset);
-                      return (
-                        <div key={asset.assetId} className="flex items-start gap-4 p-4 border rounded-lg">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            asset.healthScore < 50 ? 'bg-red-100' : 'bg-yellow-100'
-                          }`}>
-                            <AlertTriangle className={`w-5 h-5 ${
-                              asset.healthScore < 50 ? 'text-red-600' : 'text-yellow-600'
-                            }`} />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h4 className="font-semibold">{asset.name}</h4>
-                                <p className="text-sm text-muted-foreground">{asset.assetId} • {asset.location.split(',')[0]}</p>
+                  {assets.filter((a) => a.healthScore < 70).length > 0 ? (
+                    assets
+                      .filter((a) => a.healthScore < 70)
+                      .map((asset) => {
+                        const recommendation = getAssetRecommendation(asset);
+                        return (
+                          <div
+                            key={asset.assetId}
+                            className="flex items-start gap-4 p-4 border rounded-lg"
+                          >
+                            <div
+                              className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                asset.healthScore < 50
+                                  ? "bg-red-100"
+                                  : "bg-yellow-100"
+                              }`}
+                            >
+                              <AlertTriangle
+                                className={`w-5 h-5 ${
+                                  asset.healthScore < 50
+                                    ? "text-red-600"
+                                    : "text-yellow-600"
+                                }`}
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h4 className="font-semibold">
+                                    {asset.name}
+                                  </h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    {asset.assetId} •{" "}
+                                    {asset.location.split(",")[0]}
+                                  </p>
+                                </div>
+                                <Badge
+                                  variant={
+                                    asset.healthScore < 50
+                                      ? "destructive"
+                                      : "secondary"
+                                  }
+                                >
+                                  {asset.healthScore}% Health
+                                </Badge>
                               </div>
-                              <Badge variant={asset.healthScore < 50 ? "destructive" : "secondary"}>
-                                {asset.healthScore}% Health
-                              </Badge>
-                            </div>
-                            <p className="text-sm mt-2">{recommendation.message}</p>
-                            <div className="flex gap-2 mt-3">
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => handleOpenAiSummary(asset)}
-                              >
-                                <Bot className="w-3 h-3 mr-1" />
-                                View AI Analysis
-                              </Button>
-                              <Button 
-                                size="sm"
-                                onClick={() => {
-                                  setPmAssetId(asset.assetId);
-                                  setPmDialog(true);
-                                }}
-                              >
-                                <Plus className="w-3 h-3 mr-1" />
-                                Schedule PM
-                              </Button>
+                              <p className="text-sm mt-2">
+                                {recommendation.message}
+                              </p>
+                              <div className="flex gap-2 mt-3">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleOpenAiSummary(asset)}
+                                >
+                                  <Bot className="w-3 h-3 mr-1" />
+                                  View AI Analysis
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setPmAssetId(asset.assetId);
+                                    setPmDialog(true);
+                                  }}
+                                >
+                                  <Plus className="w-3 h-3 mr-1" />
+                                  Schedule PM
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })
+                        );
+                      })
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-green-500" />
-                      <p className="font-medium">All assets are in good condition!</p>
-                      <p className="text-sm">No immediate maintenance actions required.</p>
+                      <p className="font-medium">
+                        All assets are in good condition!
+                      </p>
+                      <p className="text-sm">
+                        No immediate maintenance actions required.
+                      </p>
                     </div>
                   )}
 
-                  {requests.filter(r => r.status === 'pending').length > 0 && (
+                  {requests.filter((r) => r.status === "pending").length >
+                    0 && (
                     <div className="border-t pt-4 mt-4">
                       <h4 className="font-semibold mb-3 flex items-center gap-2">
                         <Clock className="w-4 h-4" />
-                        Pending Requests ({requests.filter(r => r.status === 'pending').length})
+                        Pending Requests (
+                        {requests.filter((r) => r.status === "pending").length})
                       </h4>
                       <p className="text-sm text-muted-foreground mb-2">
-                        {requests.filter(r => r.status === 'pending' && r.urgency === 'immediately').length > 0 && (
+                        {requests.filter(
+                          (r) =>
+                            r.status === "pending" &&
+                            r.urgency === "immediately",
+                        ).length > 0 && (
                           <span className="text-red-600 font-medium">
-                            {requests.filter(r => r.status === 'pending' && r.urgency === 'immediately').length} urgent request(s) need immediate attention.
+                            {
+                              requests.filter(
+                                (r) =>
+                                  r.status === "pending" &&
+                                  r.urgency === "immediately",
+                              ).length
+                            }{" "}
+                            urgent request(s) need immediate attention.
                           </span>
                         )}
                       </p>
@@ -1070,40 +1404,52 @@ export default function ManagerDashboard() {
       </Tabs>
 
       {/* Approve Dialog */}
-      <Dialog open={!!approveDialog} onOpenChange={(open) => !open && setApproveDialog(null)}>
+      <Dialog
+        open={!!approveDialog}
+        onOpenChange={(open) => !open && setApproveDialog(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Approve & Schedule Request</DialogTitle>
             <DialogDescription>
-              Assign a technician and schedule the maintenance for <strong>{approveDialog?.assetName}</strong>.
+              Assign a technician and schedule the maintenance for{" "}
+              <strong>{approveDialog?.assetName}</strong>.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Technician</label>
-              <Select value={technicianToAssign} onValueChange={setTechnicianToAssign}>
+              <Select
+                value={technicianToAssign}
+                onValueChange={setTechnicianToAssign}
+              >
                 <SelectTrigger data-testid="select-technician">
                   <SelectValue placeholder="Select technician..." />
                 </SelectTrigger>
                 <SelectContent>
                   {technicians.map((tech) => (
-                    <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
+                    <SelectItem key={tech.id} value={tech.id}>
+                      {tech.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Scheduled Date</label>
-              <Input 
-                type="date" 
-                value={scheduledDate} 
+              <Input
+                type="date"
+                value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
                 data-testid="input-scheduled-date"
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Urgency</label>
-              <Select value={urgency} onValueChange={(v: UrgencyType) => setUrgency(v)}>
+              <Select
+                value={urgency}
+                onValueChange={(v: UrgencyType) => setUrgency(v)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1111,19 +1457,29 @@ export default function ManagerDashboard() {
                   <SelectItem value="standstill">Stand Still</SelectItem>
                   <SelectItem value="immediately">Immediately</SelectItem>
                   <SelectItem value="on_occasion">On Occasion</SelectItem>
-                  <SelectItem value="during_maintenance">During Maintenance</SelectItem>
+                  <SelectItem value="during_maintenance">
+                    During Maintenance
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setApproveDialog(null)}>Cancel</Button>
-            <Button 
-              onClick={handleApprove} 
-              disabled={!technicianToAssign || !scheduledDate || approveMutation.isPending}
+            <Button variant="outline" onClick={() => setApproveDialog(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApprove}
+              disabled={
+                !technicianToAssign ||
+                !scheduledDate ||
+                approveMutation.isPending
+              }
               data-testid="button-confirm-approve"
             >
-              {approveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {approveMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               Approve & Schedule
             </Button>
           </DialogFooter>
@@ -1131,16 +1487,20 @@ export default function ManagerDashboard() {
       </Dialog>
 
       {/* Deny Dialog */}
-      <Dialog open={!!denyDialog} onOpenChange={(open) => !open && setDenyDialog(null)}>
+      <Dialog
+        open={!!denyDialog}
+        onOpenChange={(open) => !open && setDenyDialog(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Deny Request</DialogTitle>
             <DialogDescription>
-              Please provide a reason for denying the request for <strong>{denyDialog?.assetName}</strong>.
+              Please provide a reason for denying the request for{" "}
+              <strong>{denyDialog?.assetName}</strong>.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Textarea 
+            <Textarea
               placeholder="Reason for denial..."
               value={denyReason}
               onChange={(e) => setDenyReason(e.target.value)}
@@ -1149,14 +1509,20 @@ export default function ManagerDashboard() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDenyDialog(null)}>Cancel</Button>
-            <Button 
+            <Button variant="outline" onClick={() => setDenyDialog(null)}>
+              Cancel
+            </Button>
+            <Button
               variant="destructive"
-              onClick={handleDeny} 
+              onClick={handleDeny}
               disabled={!denyReason || denyMutation.isPending}
               data-testid="button-confirm-deny"
             >
-              {denyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
+              {denyMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <XCircle className="h-4 w-4 mr-2" />
+              )}
               Deny Request
             </Button>
           </DialogFooter>
@@ -1164,12 +1530,16 @@ export default function ManagerDashboard() {
       </Dialog>
 
       {/* Close Dialog */}
-      <Dialog open={!!closeDialog} onOpenChange={(open) => !open && setCloseDialog(null)}>
+      <Dialog
+        open={!!closeDialog}
+        onOpenChange={(open) => !open && setCloseDialog(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Close Request</DialogTitle>
             <DialogDescription>
-              The requester has confirmed completion. Do you want to close this request?
+              The requester has confirmed completion. Do you want to close this
+              request?
             </DialogDescription>
           </DialogHeader>
           {closeDialog?.requesterFeedback && (
@@ -1181,13 +1551,21 @@ export default function ManagerDashboard() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCloseDialog(null)}>Cancel</Button>
-            <Button 
-              onClick={() => closeDialog && closeMutation.mutate(closeDialog.id)} 
+            <Button variant="outline" onClick={() => setCloseDialog(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                closeDialog && closeMutation.mutate(closeDialog.id)
+              }
               disabled={closeMutation.isPending}
               data-testid="button-confirm-close"
             >
-              {closeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+              {closeMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+              )}
               Close Request
             </Button>
           </DialogFooter>
@@ -1195,17 +1573,28 @@ export default function ManagerDashboard() {
       </Dialog>
 
       {/* User Dialog */}
-      <Dialog open={!!userDialog} onOpenChange={(open) => !open && setUserDialog(null)}>
+      <Dialog
+        open={!!userDialog}
+        onOpenChange={(open) => !open && setUserDialog(null)}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{userDialog?.mode === 'create' ? 'Create New User' : 'Edit User'}</DialogTitle>
+            <DialogTitle>
+              {userDialog?.mode === "create" ? "Create New User" : "Edit User"}
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={userDialog?.mode === 'create' ? handleCreateUser : handleUpdateUser}>
+          <form
+            onSubmit={
+              userDialog?.mode === "create"
+                ? handleCreateUser
+                : handleUpdateUser
+            }
+          >
             <div className="space-y-4 py-4">
-              {userDialog?.mode === 'create' && (
+              {userDialog?.mode === "create" && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Email</label>
-                  <Input 
+                  <Input
                     type="email"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
@@ -1217,26 +1606,33 @@ export default function ManagerDashboard() {
               )}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Name</label>
-                <Input 
+                <Input
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  required={userDialog?.mode === 'create'}
+                  required={userDialog?.mode === "create"}
                   data-testid="input-name"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Password {userDialog?.mode === 'edit' && '(leave blank to keep current)'}</label>
-                <Input 
+                <label className="text-sm font-medium">
+                  Password{" "}
+                  {userDialog?.mode === "edit" &&
+                    "(leave blank to keep current)"}
+                </label>
+                <Input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  required={userDialog?.mode === 'create'}
+                  required={userDialog?.mode === "create"}
                   data-testid="input-password"
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Role</label>
-                <Select value={newRole} onValueChange={(v: any) => setNewRole(v)}>
+                <Select
+                  value={newRole}
+                  onValueChange={(v: any) => setNewRole(v)}
+                >
                   <SelectTrigger data-testid="select-role">
                     <SelectValue />
                   </SelectTrigger>
@@ -1249,16 +1645,25 @@ export default function ManagerDashboard() {
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setUserDialog(null)}>Cancel</Button>
-              <Button 
-                type="submit" 
-                disabled={createUserMutation.isPending || updateUserMutation.isPending}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setUserDialog(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  createUserMutation.isPending || updateUserMutation.isPending
+                }
                 data-testid="button-save-user"
               >
-                {(createUserMutation.isPending || updateUserMutation.isPending) ? (
+                {createUserMutation.isPending ||
+                updateUserMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 ) : null}
-                {userDialog?.mode === 'create' ? 'Create User' : 'Save Changes'}
+                {userDialog?.mode === "create" ? "Create User" : "Save Changes"}
               </Button>
             </DialogFooter>
           </form>
@@ -1290,7 +1695,7 @@ export default function ManagerDashboard() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Description</label>
-                <Textarea 
+                <Textarea
                   value={pmDescription}
                   onChange={(e) => setPmDescription(e.target.value)}
                   placeholder="Describe the maintenance activity..."
@@ -1316,7 +1721,7 @@ export default function ManagerDashboard() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Next Due Date</label>
-                  <Input 
+                  <Input
                     type="date"
                     value={pmNextDueDate}
                     onChange={(e) => setPmNextDueDate(e.target.value)}
@@ -1326,21 +1731,30 @@ export default function ManagerDashboard() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Assign Technician</label>
-                  <Select value={pmTechnicianId} onValueChange={setPmTechnicianId}>
+                  <label className="text-sm font-medium">
+                    Assign Technician
+                  </label>
+                  <Select
+                    value={pmTechnicianId}
+                    onValueChange={setPmTechnicianId}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Optional..." />
                     </SelectTrigger>
                     <SelectContent>
                       {technicians.map((tech) => (
-                        <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
+                        <SelectItem key={tech.id} value={tech.id}>
+                          {tech.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Est. Duration (min)</label>
-                  <Input 
+                  <label className="text-sm font-medium">
+                    Est. Duration (min)
+                  </label>
+                  <Input
                     type="number"
                     value={pmDuration}
                     onChange={(e) => setPmDuration(e.target.value)}
@@ -1349,8 +1763,10 @@ export default function ManagerDashboard() {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Tasks (one per line)</label>
-                <Textarea 
+                <label className="text-sm font-medium">
+                  Tasks (one per line)
+                </label>
+                <Textarea
                   value={pmTasks}
                   onChange={(e) => setPmTasks(e.target.value)}
                   placeholder="Check oil levels&#10;Inspect belts&#10;Clean filters"
@@ -1359,9 +1775,22 @@ export default function ManagerDashboard() {
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setPmDialog(false)}>Cancel</Button>
-              <Button type="submit" disabled={!pmAssetId || !pmDescription || createPmMutation.isPending}>
-                {createPmMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPmDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  !pmAssetId || !pmDescription || createPmMutation.isPending
+                }
+              >
+                {createPmMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
                 Create Schedule
               </Button>
             </DialogFooter>
@@ -1370,7 +1799,10 @@ export default function ManagerDashboard() {
       </Dialog>
 
       {/* AI Summary Dialog */}
-      <Dialog open={!!aiSummaryDialog} onOpenChange={(open) => !open && setAiSummaryDialog(null)}>
+      <Dialog
+        open={!!aiSummaryDialog}
+        onOpenChange={(open) => !open && setAiSummaryDialog(null)}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1392,14 +1824,23 @@ export default function ManagerDashboard() {
                 {aiSummary ? (
                   <MarkdownRenderer content={aiSummary} />
                 ) : (
-                  <p className="text-sm text-muted-foreground">No summary available.</p>
+                  <p className="text-sm text-muted-foreground">
+                    No summary available.
+                  </p>
                 )}
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAiSummaryDialog(null)}>Close</Button>
-            <Button onClick={() => aiSummaryDialog && fetchAiSummary(aiSummaryDialog.assetId)} disabled={aiLoading}>
+            <Button variant="outline" onClick={() => setAiSummaryDialog(null)}>
+              Close
+            </Button>
+            <Button
+              onClick={() =>
+                aiSummaryDialog && fetchAiSummary(aiSummaryDialog.assetId)
+              }
+              disabled={aiLoading}
+            >
               Refresh Summary
             </Button>
           </DialogFooter>
@@ -1407,7 +1848,10 @@ export default function ManagerDashboard() {
       </Dialog>
 
       {/* Asset Detail Dialog */}
-      <Dialog open={!!assetDetailDialog} onOpenChange={(open) => !open && setAssetDetailDialog(null)}>
+      <Dialog
+        open={!!assetDetailDialog}
+        onOpenChange={(open) => !open && setAssetDetailDialog(null)}
+      >
         <DialogContent className="max-w-3xl max-h-[85vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1428,28 +1872,56 @@ export default function ManagerDashboard() {
                 <div>
                   <h4 className="font-semibold mb-3 flex items-center gap-2">
                     <ClipboardList className="w-4 h-4" />
-                    Pending/Ongoing Requests ({assetRequests.filter(r => ['pending', 'scheduled', 'ongoing'].includes(r.status)).length})
+                    Pending/Ongoing Requests (
+                    {
+                      assetRequests.filter((r) =>
+                        ["pending", "scheduled", "ongoing"].includes(r.status),
+                      ).length
+                    }
+                    )
                   </h4>
-                  {assetRequests.filter(r => ['pending', 'scheduled', 'ongoing'].includes(r.status)).length > 0 ? (
+                  {assetRequests.filter((r) =>
+                    ["pending", "scheduled", "ongoing"].includes(r.status),
+                  ).length > 0 ? (
                     <div className="space-y-2">
-                      {assetRequests.filter(r => ['pending', 'scheduled', 'ongoing'].includes(r.status)).map(req => (
-                        <div key={req.id} className="border rounded-lg p-3 space-y-1">
-                          <div className="flex justify-between items-start">
-                            <span className="font-mono text-xs">{req.tswrNo}</span>
-                            <Badge variant="outline" className={getStatusColor(req.status)}>
-                              {getStatusLabel(req.status)}
-                            </Badge>
+                      {assetRequests
+                        .filter((r) =>
+                          ["pending", "scheduled", "ongoing"].includes(
+                            r.status,
+                          ),
+                        )
+                        .map((req) => (
+                          <div
+                            key={req.id}
+                            className="border rounded-lg p-3 space-y-1"
+                          >
+                            <div className="flex justify-between items-start">
+                              <span className="font-mono text-xs">
+                                {req.tswrNo}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={getStatusColor(req.status)}
+                              >
+                                {getStatusLabel(req.status)}
+                              </Badge>
+                            </div>
+                            <p className="text-sm">{req.workDescription}</p>
+                            <div className="flex gap-4 text-xs text-muted-foreground">
+                              <span>
+                                Urgency: {getUrgencyLabel(req.urgency)}
+                              </span>
+                              {req.assignedTo && (
+                                <span>Assigned: {req.assignedTo}</span>
+                              )}
+                            </div>
                           </div>
-                          <p className="text-sm">{req.workDescription}</p>
-                          <div className="flex gap-4 text-xs text-muted-foreground">
-                            <span>Urgency: {getUrgencyLabel(req.urgency)}</span>
-                            {req.assignedTo && <span>Assigned: {req.assignedTo}</span>}
-                          </div>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No pending or ongoing requests.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No pending or ongoing requests.
+                    </p>
                   )}
                 </div>
 
@@ -1460,53 +1932,81 @@ export default function ManagerDashboard() {
                   </h4>
                   {assetServiceReports.length > 0 ? (
                     <div className="space-y-2">
-                      {assetServiceReports.map(report => (
-                        <div key={report._id} className="border rounded-lg p-3 space-y-2">
+                      {assetServiceReports.map((report) => (
+                        <div
+                          key={report._id}
+                          className="border rounded-lg p-3 space-y-2"
+                        >
                           <div className="flex justify-between items-start">
                             <div>
-                              <span className="font-mono text-xs">{report.reportId}</span>
+                              <span className="font-mono text-xs">
+                                {report.reportId}
+                              </span>
                               <span className="text-xs text-muted-foreground ml-2">
-                                {new Date(report.serviceDate).toLocaleDateString()}
+                                {new Date(
+                                  report.serviceDate,
+                                ).toLocaleDateString()}
                               </span>
                             </div>
-                            <Badge variant="outline" className="capitalize">{report.serviceType}</Badge>
+                            <Badge variant="outline" className="capitalize">
+                              {report.serviceType}
+                            </Badge>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-sm"><span className="font-medium">Problem:</span> {report.workDescription}</p>
-                            <p className="text-sm"><span className="font-medium">Work Done:</span> {report.reportFindings}</p>
+                            <p className="text-sm">
+                              <span className="font-medium">Problem:</span>{" "}
+                              {report.workDescription}
+                            </p>
+                            <p className="text-sm">
+                              <span className="font-medium">Work Done:</span>{" "}
+                              {report.reportFindings}
+                            </p>
                           </div>
                           <div className="flex gap-4 text-xs text-muted-foreground">
                             <span>By: {report.preparedByName}</span>
                             <span>Hours: {report.manHours.toFixed(1)}</span>
-                            <span>Cost: ₱{(report.laborCost + report.totalPartsCost).toLocaleString()}</span>
+                            <span>
+                              Cost: ₱
+                              {(
+                                report.laborCost + report.totalPartsCost
+                              ).toLocaleString()}
+                            </span>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No service reports found.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No service reports found.
+                    </p>
                   )}
                 </div>
               </div>
             )}
           </ScrollArea>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAssetDetailDialog(null)}>Close</Button>
+            <Button
+              variant="outline"
+              onClick={() => setAssetDetailDialog(null)}
+            >
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Request Detail Dialog */}
-      <Dialog open={!!requestDetailDialog} onOpenChange={(open) => !open && setRequestDetailDialog(null)}>
+      <Dialog
+        open={!!requestDetailDialog}
+        onOpenChange={(open) => !open && setRequestDetailDialog(null)}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ClipboardList className="w-5 h-5" />
               Request Details
             </DialogTitle>
-            <DialogDescription>
-              {requestDetailDialog?.tswrNo}
-            </DialogDescription>
+            <DialogDescription>{requestDetailDialog?.tswrNo}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1521,34 +2021,51 @@ export default function ManagerDashboard() {
               <div>
                 <span className="text-muted-foreground">Urgency:</span>
                 <Badge variant="secondary" className="mt-1">
-                  {requestDetailDialog && getUrgencyLabel(requestDetailDialog.urgency)}
+                  {requestDetailDialog &&
+                    getUrgencyLabel(requestDetailDialog.urgency)}
                 </Badge>
               </div>
               <div>
-                <span className="text-muted-foreground">Disrupts Operation:</span>
-                <p className="font-medium">{requestDetailDialog?.disruptsOperation ? "Yes" : "No"}</p>
+                <span className="text-muted-foreground">
+                  Disrupts Operation:
+                </span>
+                <p className="font-medium">
+                  {requestDetailDialog?.disruptsOperation ? "Yes" : "No"}
+                </p>
               </div>
               <div>
                 <span className="text-muted-foreground">Submitted By:</span>
-                <p className="font-medium">{requestDetailDialog?.submittedBy}</p>
+                <p className="font-medium">
+                  {requestDetailDialog?.submittedBy}
+                </p>
               </div>
               <div>
                 <span className="text-muted-foreground">Submitted At:</span>
                 <p className="font-medium">
-                  {requestDetailDialog?.submittedAt && new Date(requestDetailDialog.submittedAt).toLocaleString()}
+                  {requestDetailDialog?.submittedAt &&
+                    new Date(requestDetailDialog.submittedAt).toLocaleString()}
                 </p>
               </div>
             </div>
             <div>
-              <span className="text-sm text-muted-foreground">Work Description:</span>
+              <span className="text-sm text-muted-foreground">
+                Work Description:
+              </span>
               <div className="bg-muted p-3 rounded-lg mt-1">
-                <p className="text-sm">{requestDetailDialog?.workDescription}</p>
+                <p className="text-sm">
+                  {requestDetailDialog?.workDescription}
+                </p>
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRequestDetailDialog(null)}>Close</Button>
-            <Button 
+            <Button
+              variant="outline"
+              onClick={() => setRequestDetailDialog(null)}
+            >
+              Close
+            </Button>
+            <Button
               onClick={() => {
                 if (requestDetailDialog) {
                   setRequestDetailDialog(null);
