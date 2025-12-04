@@ -3,8 +3,7 @@ import User from './models/User';
 import WorkRequest from './models/WorkRequest';
 import Asset from './models/Asset';
 import PreventiveMaintenance from './models/PreventiveMaintenance';
-
-const MONGODB_URI = 'mongodb+srv://pandazbot:107697@cluster1.udu4e.mongodb.net/myFirstDatabase?retryWrites=true&w=majority';
+import { MONGODB_URI } from './db';
 
 async function seedDatabase() {
   try {

@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://pandazbot:107697@cluster1.udu4e.mongodb.net/myFirstDatabase?retryWrites=true&w=majority';
+if (!process.env.MONGODB_URI) {
+  console.error('❌ MONGODB_URI environment variable is not set');
+  process.exit(1);
+}
+
+const MONGODB_URI: string = process.env.MONGODB_URI;
 
 export async function connectDB() {
   try {
@@ -11,6 +16,8 @@ export async function connectDB() {
     process.exit(1);
   }
 }
+
+export { MONGODB_URI };
 
 mongoose.connection.on('disconnected', () => {
   console.log('⚠️ MongoDB disconnected');

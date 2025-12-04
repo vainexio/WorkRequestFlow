@@ -13,7 +13,7 @@ import {
   getStatusLabel,
   getUrgencyLabel,
   UrgencyType,
-} from "@/lib/mock-data";
+} from "@/lib/types";
 import {
   Card,
   CardContent,

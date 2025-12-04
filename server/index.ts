@@ -4,7 +4,7 @@ import MongoStore from "connect-mongodb-session";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { connectDB } from "./db";
+import { connectDB, MONGODB_URI } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
@@ -33,7 +33,6 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-const MONGODB_URI = "mongodb+srv://workquest_db_user:workQuestAdministrator107697@workquest.rbdsm5r.mongodb.net/Database?retryWrites=true&w=majority";
 const MongoDBStore = MongoStore(session);
 
 const store = new MongoDBStore({
