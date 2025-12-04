@@ -44,10 +44,14 @@ store.on("error", function (error) {
   console.error("Session store error:", error);
 });
 
+if (!process.env.SESSION_SECRET) {
+  console.error("❌ SESSION_SECRET environment variable is not set");
+  process.exit(1);
+}
+
 app.use(
   session({
-    secret:
-      process.env.SESSION_SECRET || "workquest-secret-key-change-in-production",
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     store: store,
@@ -117,20 +121,7 @@ app.use((req, res, next) => {
   }
 
   const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(5000, () => {
-    console.log("Server listening on port 5000");
+  httpServer.listen(port, "0.0.0.0", () => {
+    console.log(`Server listening on port ${port}`);
   });
-
-  /*
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
-  */
 })();
