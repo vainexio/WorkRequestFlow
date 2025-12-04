@@ -33,30 +33,31 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://pandazbot:107697@cluster1.udu4e.mongodb.net/myFirstDatabase?retryWrites=true&w=majority';
+const MONGODB_URI = "mongodb+srv://workquest_db_user:workQuestAdministrator107697@workquest.rbdsm5r.mongodb.net/Database?retryWrites=true&w=majority";
 const MongoDBStore = MongoStore(session);
 
 const store = new MongoDBStore({
   uri: MONGODB_URI,
-  collection: 'sessions',
+  collection: "sessions",
 });
 
-store.on('error', function(error) {
-  console.error('Session store error:', error);
+store.on("error", function (error) {
+  console.error("Session store error:", error);
 });
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'workquest-secret-key-change-in-production',
+    secret:
+      process.env.SESSION_SECRET || "workquest-secret-key-change-in-production",
     resave: false,
     saveUninitialized: false,
     store: store,
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === "production",
     },
-  })
+  }),
 );
 
 export function log(message: string, source = "express") {
@@ -118,8 +119,8 @@ app.use((req, res, next) => {
 
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(5000, () => {
-  console.log('Server listening on port 5000');
-});
+    console.log("Server listening on port 5000");
+  });
 
   /*
   httpServer.listen(
