@@ -95,7 +95,7 @@ shared/
 ## External Dependencies
 
 ### Database
-- **MongoDB Atlas**: Cloud-hosted MongoDB instance (connection string in code)
+- **MongoDB Atlas**: Cloud-hosted MongoDB instance (connection via MONGODB_URI environment variable)
 - **Mongoose**: ODM for MongoDB with schema validation
 
 ### UI Libraries
@@ -117,7 +117,13 @@ shared/
 - **Zod**: Runtime type validation
 - **React Hook Form**: Form state management
 
+### Environment Variables
+The application requires the following environment variables:
+- **MONGODB_URI**: MongoDB connection string (required)
+- **SESSION_SECRET**: Secret key for session encryption (required)
+- **PORT**: Server port (optional, defaults to 5000)
+
 ### Notes
 - The `shared/schema.ts` file contains Drizzle ORM schemas for PostgreSQL, but the application currently uses MongoDB/Mongoose exclusively
-- Database credentials are hardcoded in the codebase (should be moved to environment variables for production)
-- Authentication uses plain text passwords (appropriate for development only)
+- Frontend types are defined in `client/src/lib/types.ts`
+- Authentication uses plain text passwords (appropriate for development only - password hashing should be implemented for production)
