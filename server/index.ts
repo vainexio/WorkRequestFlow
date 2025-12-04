@@ -117,6 +117,11 @@ app.use((req, res, next) => {
   }
 
   const port = parseInt(process.env.PORT || "5000", 10);
+  httpServer.listen(5000, () => {
+  console.log('Server listening on port 5000');
+});
+
+  /*
   httpServer.listen(
     {
       port,
@@ -127,4 +132,5 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
     },
   );
+  */
 })();
