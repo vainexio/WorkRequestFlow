@@ -19,11 +19,11 @@ async function seedDatabase() {
 
     const users = await User.create([
       {
-        email: 'manager@workquest.com',
-        username: 'manager',
+        email: 'admin@workquest.com',
+        username: 'admin',
         password: 'password123',
         role: 'manager',
-        name: 'Manager User',
+        name: 'Admin User',
       },
       {
         email: 'tech@workquest.com',
@@ -38,20 +38,6 @@ async function seedDatabase() {
         password: 'password123',
         role: 'employee',
         name: 'Employee User',
-      },
-      {
-        email: 'sarah@workquest.com',
-        username: 'sarah',
-        password: 'password123',
-        role: 'employee',
-        name: 'Sarah Connor',
-      },
-      {
-        email: 'john@workquest.com',
-        username: 'john',
-        password: 'password123',
-        role: 'technician',
-        name: 'John Smith',
       },
     ]);
 
@@ -74,7 +60,7 @@ async function seedDatabase() {
             date: new Date('2024-06-15'),
             type: 'preventive',
             description: 'Regular filter cleaning and refrigerant check',
-            technicianName: 'John Smith',
+            technicianName: 'Technician User',
             cost: 200,
           },
         ],
@@ -131,7 +117,7 @@ async function seedDatabase() {
             date: new Date('2024-03-10'),
             type: 'corrective',
             description: 'Replaced lamp and cleaned filters',
-            technicianName: 'John Smith',
+            technicianName: 'Technician User',
             cost: 350,
           },
         ],
@@ -167,9 +153,9 @@ async function seedDatabase() {
 
     console.log('Created assets:', assets.map(a => a.assetId));
 
-    const employeeUser = users.find(u => u.username === 'sarah');
+    const employeeUser = users.find(u => u.username === 'employee');
     const techUser = users.find(u => u.username === 'tech');
-    const managerUser = users.find(u => u.username === 'manager');
+    const managerUser = users.find(u => u.username === 'admin');
 
     if (!employeeUser || !techUser || !managerUser) {
       throw new Error('Required users not found');
